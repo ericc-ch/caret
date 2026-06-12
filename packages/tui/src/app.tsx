@@ -1,78 +1,67 @@
-import process from "node:process"
-import { Agent, type SDKAgent } from "@cursor/sdk"
 import { createMemo, createSignal, onCleanup, onMount, Show } from "solid-js"
-import { runPrompt } from "./lib/agent.ts"
 import { ChatView } from "./components/chat/chat-view.tsx"
 import { createChatStore } from "./components/chat/state.ts"
 import { Prompt } from "./components/prompt/prompt.tsx"
 import { usePromptRef } from "./context/prompt.tsx"
+import { runtime } from "./runtime/app-runtime.ts"
+import { Session, type SessionId, type SessionStatus } from "./services/session.ts"
 import { SplitBorder } from "./ui/border.ts"
 import { useTheme } from "./lib/theme.tsx"
+
+function errorMessage(cause: unknown) {
+  return cause instanceof Error ? cause.message : String(cause)
+}
 
 export function App() {
   const { theme } = useTheme()
   const promptRef = usePromptRef()
   const chat = createChatStore()
-  const [agent, setAgent] = createSignal<SDKAgent>()
-  const [running, setRunning] = createSignal(false)
+  const [activeSessionId, setActiveSessionId] = createSignal<SessionId>()
+  const [sessionStatus, setSessionStatus] = createSignal<SessionStatus>({ type: "idle" })
+  const [ready, setReady] = createSignal(false)
   const [error, setError] = createSignal<string>()
 
   const promptStatus = createMemo(() => {
-    if (running()) return "running"
-    if (!agent()) return error() ? "unavailable" : "connecting"
+    if (sessionStatus().type === "busy") return "running"
+    if (!ready()) return error() ? "unavailable" : "connecting"
     return "ready"
   })
 
   onMount(async () => {
     try {
-      const apiKey = process.env["CURSOR_API_KEY"]
-      const created = await Agent.create({
-        ...(apiKey ? { apiKey } : {}),
-        model: { id: "composer-2.5" },
-        local: { cwd: process.cwd() },
-      })
-      setAgent(created)
+      const info = await runtime.runPromise(Session.use((session) => session.create()))
+      setActiveSessionId(info.id)
+      setReady(true)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      setError(errorMessage(cause))
     }
   })
 
   onCleanup(() => {
-    void agent()?.close()
+    void runtime.dispose()
   })
 
   const submit = async (text: string) => {
-    const current = agent()
-    if (!current || running()) return
+    const sessionId = activeSessionId()
+    if (!sessionId || sessionStatus().type === "busy") return
 
-    setRunning(true)
     setError(undefined)
-    chat.addUser(text)
-
-    const assistantIndex = chat.startAssistant()
-    let thinkingIndex: number | undefined
-
-    const ensureThinking = () => {
-      thinkingIndex ??= chat.startThinking()
-      return thinkingIndex
-    }
 
     try {
-      await runPrompt(current, text, {
-        onTextDelta: (delta) => chat.appendAssistant(assistantIndex, delta),
-        onThinkingDelta: (delta) => chat.appendThinking(ensureThinking(), delta),
-        onAssistantText: (value) => chat.setAssistant(assistantIndex, value),
-        onThinkingText: (value) => chat.setThinking(ensureThinking(), value),
-        onThinkingDone: () => {
-          if (thinkingIndex !== undefined) chat.finishThinking(thinkingIndex)
-        },
-      })
+      await runtime.runPromise(
+        Session.use((session) =>
+          session.prompt({
+            sessionId,
+            text,
+            onSnapshot: (snapshot) => {
+              setSessionStatus(snapshot.status)
+              chat.syncFromMessages(snapshot.messages)
+            },
+          }),
+        ),
+      )
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
-    } finally {
-      chat.finishAssistant(assistantIndex)
-      if (thinkingIndex !== undefined) chat.finishThinking(thinkingIndex)
-      setRunning(false)
+      setError(errorMessage(cause))
     }
   }
 

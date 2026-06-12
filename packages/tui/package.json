@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@cursor/sdk": "^1.0.18",
+    "effect": "catalog:effect",
     "@opentui/core": "catalog:opentui",
     "@opentui/solid": "catalog:opentui",
     "opentui-spinner": "catalog:opentui",

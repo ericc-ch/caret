@@ -28,7 +28,7 @@ git show --stat --patch --no-color HEAD
 
 ## Subagents
 
-Launch the following five subagents **in parallel** with `model: "composer-2.5"` (see [AGENTS.md](../../../AGENTS.md) — never `composer-2.5-fast` or Claude). They must only report findings and must **not** edit files, run formatters, create worktrees, or commit.
+Launch the following five subagents **in parallel** with `model: "composer-2.5"`. They must only report findings and must **not** edit files, run formatters, create worktrees, or commit.
 
 Pass the full combined diff when possible; if it is too large, pass the file list, relevant hunks, and a scope summary.
 

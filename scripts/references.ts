@@ -34,6 +34,11 @@ const repositories = [
     url: "https://github.com/anomalyco/opencode.git",
     branch: "dev",
   },
+  {
+    name: "Cursor Cookbook",
+    directory: "cursor-cookbook",
+    url: "https://github.com/cursor/cookbook.git",
+  },
 ] satisfies ReadonlyArray<ReferenceRepository>
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))

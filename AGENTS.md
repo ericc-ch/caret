@@ -38,16 +38,6 @@ When spawning Task subagents (review, explore, `/simplify`, etc.), **always** pa
 
 Build chat bubbles and the prompt first. Tool cards, permissions, and CLI packaging come later.
 
-### Cursor SDK integration
-
-- **Agent lifecycle:** `Agent.create({ local: { cwd } })` → `agent.send(prompt)` → `run.stream()` → `run.wait()`. Always dispose (`await using` or `try/finally`).
-- **Streaming UI:** fold `SDKMessage` events into chat state — `assistant` text, `thinking`, and later `tool_call`.
-- **Live typing:** use `onDelta` on `agent.send()` for `text-delta` / `thinking-delta` when token-level updates matter.
-- **Headless defaults:** SDK runs approve tools without a human in the loop. Interactive permission UI is a later concern; do not reach for ACP to solve it.
-- **Types:** treat tool `args` and `result` as `unknown`; the stream envelope (`type`, `call_id`, `name`, `status`) is stable.
-
-Cursor SDK is not open source. See [docs/references/cursor-sdk.md](docs/references/cursor-sdk.md).
-
 ## References Directory
 
 The `.references/` directory contains shallow clones of important external repositories.
@@ -60,6 +50,9 @@ Available references:
 - effect-smol — Effect v4
 - opentui — OpenTUI (terminal UI framework)
 - opencode — OpenCode (TUI UI reference; uses OpenTUI in production)
+- cursor-cookbook — Cursor SDK docs and examples (SDK itself is not open source)
+
+Cursor SDK is not open source. See `.references/cursor-cookbook` for SDK docs and examples.
 
 ## Idiomatic Effect (v4)
 
