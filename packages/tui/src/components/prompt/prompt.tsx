@@ -1,7 +1,7 @@
 import type { KeyBinding, TextareaRenderable } from "@opentui/core"
 import { createEffect, Match, on, onCleanup, Switch } from "solid-js"
 import { promptRef } from "../../reactivity/prompt-ref.ts"
-import { EmptyBorder, SplitBorder } from "../../ui/border.ts"
+import { EmptyBorder, SplitBorder } from "../../lib/border.ts"
 import { Spinner } from "../spinner.tsx"
 import { useTheme } from "../../lib/theme.tsx"
 
@@ -10,11 +10,7 @@ const keyBindings = [
   { name: "return", meta: true, action: "newline" },
 ] satisfies Array<KeyBinding>
 
-const placeholders = [
-  "Fix a failing test",
-  "Explain this module",
-  "Refactor for clarity",
-]
+const placeholders = ["Fix a failing test", "Explain this module", "Refactor for clarity"]
 
 const placeholderExample = placeholders[Math.floor(Math.random() * placeholders.length)]!
 
@@ -36,10 +32,7 @@ export type PromptRef = {
   blur(): void
 }
 
-export function Prompt(props: {
-  status: PromptStatus
-  onSubmit: (text: string) => void
-}) {
+export function Prompt(props: { status: PromptStatus; onSubmit: (text: string) => void }) {
   const { theme, syntax } = useTheme()
   let textarea: TextareaRenderable | undefined
 
@@ -150,7 +143,9 @@ export function Prompt(props: {
           height={1}
           border={["bottom"]}
           borderColor={panelBackground()}
-          customBorderChars={panelBackground().a !== 0 ? promptBottomCap : promptBottomCapTransparent}
+          customBorderChars={
+            panelBackground().a !== 0 ? promptBottomCap : promptBottomCapTransparent
+          }
         />
       </box>
       <box width="100%" flexDirection="row" justifyContent="space-between">

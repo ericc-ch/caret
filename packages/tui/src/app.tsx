@@ -5,7 +5,7 @@ import { Prompt } from "./components/prompt/prompt.tsx"
 import { sessionSnapshotAtom } from "./reactivity/atoms.ts"
 import { runtime } from "./runtime/app-runtime.ts"
 import { Session, type SessionId } from "./services/session.ts"
-import { SplitBorder } from "./ui/border.ts"
+import { SplitBorder } from "./lib/border.ts"
 import { useTheme } from "./lib/theme.tsx"
 
 function errorMessage(cause: unknown) {

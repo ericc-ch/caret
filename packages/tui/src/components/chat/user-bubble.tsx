@@ -1,4 +1,4 @@
-import { SplitBorder } from "../../ui/border.ts"
+import { SplitBorder } from "../../lib/border.ts"
 import { useTheme } from "../../lib/theme.tsx"
 
 export function UserBubble(props: { text: string; index: number }) {
@@ -12,7 +12,12 @@ export function UserBubble(props: { text: string; index: number }) {
       marginTop={props.index === 0 ? 0 : 1}
       flexShrink={0}
     >
-      <box paddingTop={1} paddingBottom={1} paddingLeft={2} backgroundColor={theme().backgroundPanel}>
+      <box
+        paddingTop={1}
+        paddingBottom={1}
+        paddingLeft={2}
+        backgroundColor={theme().backgroundPanel}
+      >
         <text fg={theme().text}>{props.text}</text>
       </box>
     </box>
