@@ -24,6 +24,11 @@ const repositories = [
     url: "https://github.com/anomalyco/opentui.git",
   },
   {
+    name: "opentui-spinner",
+    directory: "opentui-spinner",
+    url: "https://github.com/msmps/opentui-spinner.git",
+  },
+  {
     name: "OpenCode",
     directory: "opencode",
     url: "https://github.com/anomalyco/opencode.git",

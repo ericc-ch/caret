@@ -1,5 +1,7 @@
 caret is an alternative terminal frontend for Cursor.
 
+The agent backend is [`@cursor/sdk`](https://cursor.com/docs/sdk/typescript) — local agents via `Agent.create()` and `run.stream()`. Do not use ACP (`agent acp`) or other Cursor CLI protocols.
+
 Our priorities are (not ordered, all are important):
 
 - Maintainability
@@ -16,13 +18,35 @@ Run `bun run check` after completing a task (typecheck per package, `vitest` at 
 
 For specific code style and testing guidelines, see [docs/conventions.md](./docs/conventions.md).
 
+## Subagents
+
+When spawning Task subagents (review, explore, `/simplify`, etc.), **always** pass `model: "composer-2.5"`.
+
+- **Do not** use any other model unless the user explicitly overrides in that message.
+- Do not inherit the parent chat model for subagents — use Composer 2.5 even when the parent is a different model.
+
 ## Workspace
 
-- `packages/tui` — OpenTUI Solid frontend (`@caret/tui`)
+- `packages/tui` — OpenTUI Solid frontend and Cursor SDK integration (`@caret/tui`)
 
 ## Architecture
 
-- `packages/tui` (`@caret/tui`) — Solid-based terminal frontend built on OpenTUI, containing components for chat, input, tool cards, and permissions.
+- `packages/tui` (`@caret/tui`) — Solid-based terminal frontend on OpenTUI. Owns the renderer, chat UI, prompt input, and `@cursor/sdk` wiring. No separate agent package for now; keep the SDK boundary inside `@caret/tui` until the surface stabilizes.
+- OpenCode (`.references/opencode`) is a **UI reference** for layout, themes, and component patterns — not a backend to port. Steal presentation ideas; do not copy its SDK/sync layer.
+
+### Current focus
+
+Build chat bubbles and the prompt first. Tool cards, permissions, and CLI packaging come later.
+
+### Cursor SDK integration
+
+- **Agent lifecycle:** `Agent.create({ local: { cwd } })` → `agent.send(prompt)` → `run.stream()` → `run.wait()`. Always dispose (`await using` or `try/finally`).
+- **Streaming UI:** fold `SDKMessage` events into chat state — `assistant` text, `thinking`, and later `tool_call`.
+- **Live typing:** use `onDelta` on `agent.send()` for `text-delta` / `thinking-delta` when token-level updates matter.
+- **Headless defaults:** SDK runs approve tools without a human in the loop. Interactive permission UI is a later concern; do not reach for ACP to solve it.
+- **Types:** treat tool `args` and `result` as `unknown`; the stream envelope (`type`, `call_id`, `name`, `status`) is stable.
+
+Cursor SDK is not open source. See [docs/references/cursor-sdk.md](docs/references/cursor-sdk.md).
 
 ## References Directory
 
@@ -35,9 +59,7 @@ Available references:
 
 - effect-smol — Effect v4
 - opentui — OpenTUI (terminal UI framework)
-- opencode — OpenCode (TUI architecture reference; uses OpenTUI in production)
-
-Cursor SDK is not open source. See [docs/references/cursor-sdk.md](docs/references/cursor-sdk.md).
+- opencode — OpenCode (TUI UI reference; uses OpenTUI in production)
 
 ## Idiomatic Effect (v4)
 

@@ -1,11 +1,19 @@
-import { TextAttributes } from "@opentui/core"
-import { render } from "@opentui/solid"
+import { extend, render } from "@opentui/solid"
+import { SpinnerRenderable } from "opentui-spinner"
+import "opentui-spinner/solid" // JSX types; register on root catalogue below
+import { App } from "./app.tsx"
+import { PromptRefProvider } from "./context/prompt.tsx"
+import { ThemeProvider } from "./lib/theme.tsx"
 
-render(() => (
-  <box alignItems="center" justifyContent="center" flexGrow={1}>
-    <box justifyContent="center" alignItems="flex-end">
-      <ascii_font font="tiny" text="caret" />
-      <text attributes={TextAttributes.DIM}>What will you build?</text>
-    </box>
-  </box>
-))
+extend({ spinner: SpinnerRenderable })
+
+render(
+  () => (
+    <ThemeProvider>
+      <PromptRefProvider>
+        <App />
+      </PromptRefProvider>
+    </ThemeProvider>
+  ),
+  { exitOnCtrlC: true },
+)

@@ -4,11 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun run --watch src/index.tsx"
+    "dev": "bun run --watch src/index.tsx",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@cursor/sdk": "^1.0.18",
     "@opentui/core": "catalog:opentui",
     "@opentui/solid": "catalog:opentui",
+    "opentui-spinner": "catalog:opentui",
     "solid-js": "catalog:opentui"
   },
   "devDependencies": {
