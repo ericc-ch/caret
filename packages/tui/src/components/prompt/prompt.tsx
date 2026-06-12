@@ -1,5 +1,6 @@
 import type { KeyBinding, TextareaRenderable } from "@opentui/core"
 import { createEffect, Match, on, onCleanup, Switch } from "solid-js"
+import { promptRef } from "../../reactivity/prompt-ref.ts"
 import { EmptyBorder, SplitBorder } from "../../ui/border.ts"
 import { Spinner } from "../spinner.tsx"
 import { useTheme } from "../../lib/theme.tsx"
@@ -38,7 +39,6 @@ export type PromptRef = {
 export function Prompt(props: {
   status: PromptStatus
   onSubmit: (text: string) => void
-  ref?: (ref: PromptRef | undefined) => void
 }) {
   const { theme, syntax } = useTheme()
   let textarea: TextareaRenderable | undefined
@@ -67,7 +67,7 @@ export function Prompt(props: {
     props.onSubmit(text)
   }
 
-  const promptRef = {
+  const handle = {
     get focused() {
       return textarea?.focused ?? false
     },
@@ -90,7 +90,7 @@ export function Prompt(props: {
   )
 
   onCleanup(() => {
-    props.ref?.(undefined)
+    promptRef.set(undefined)
   })
 
   return (
@@ -116,7 +116,7 @@ export function Prompt(props: {
           <textarea
             ref={(value) => {
               textarea = value
-              props.ref?.(promptRef)
+              promptRef.set(handle)
             }}
             onMouseDown={(event) => event.target?.focus()}
             width="100%"

@@ -1,6 +1,8 @@
 import process from "node:process"
 import { Agent, type Run, type SDKAgent } from "@cursor/sdk"
 import { Context, Effect, Layer, Ref, Schema } from "effect"
+import { appRegistry } from "../reactivity/registry.tsx"
+import { sessionSnapshotAtom } from "../reactivity/atoms.ts"
 
 export type SessionId = string
 
@@ -51,7 +53,6 @@ type SessionState = {
 type PromptInput = {
   sessionId: SessionId
   text: string
-  onSnapshot?: (snapshot: SessionSnapshot) => void
 }
 
 export type SessionInterface = {
@@ -81,8 +82,8 @@ function snapshot(state: SessionState): SessionSnapshot {
   }
 }
 
-function publishSnapshot(state: SessionState, onSnapshot?: (snapshot: SessionSnapshot) => void) {
-  onSnapshot?.(snapshot(state))
+function publishSnapshot(state: SessionState) {
+  appRegistry.set(sessionSnapshotAtom, snapshot(state))
 }
 
 function agentOptions() {
@@ -119,17 +120,21 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
         agentId: agent.agentId,
       }
 
+      const state: SessionState = {
+        info,
+        status: { type: "idle" },
+        messages: [],
+        agent,
+        currentRun: null,
+      }
+
       yield* Ref.update(sessions, (store) => {
         const next = new Map(store)
-        next.set(info.id, {
-          info,
-          status: { type: "idle" },
-          messages: [],
-          agent,
-          currentRun: null,
-        })
+        next.set(info.id, state)
         return next
       })
+
+      publishSnapshot(state)
 
       return info
     })
@@ -176,7 +181,7 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
 
       state.status = { type: "busy" }
       state.messages.push({ role: "user", text: input.text })
-      publishSnapshot(state, input.onSnapshot)
+      publishSnapshot(state)
 
       let assistantIndex: number | undefined
       let thinkingIndex: number | undefined
@@ -204,14 +209,14 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
               assistantIndex ??= state.messages.push({ role: "assistant", text: "", streaming: true }) - 1
               const message = state.messages[assistantIndex]
               if (message?.role === "assistant") message.text += text
-              publishSnapshot(state, input.onSnapshot)
+              publishSnapshot(state)
             }
 
             if (event.type === "thinking" && event.text) {
               thinkingIndex ??= state.messages.push({ role: "thinking", text: "", streaming: true }) - 1
               const message = state.messages[thinkingIndex]
               if (message?.role === "thinking") message.text = event.text
-              publishSnapshot(state, input.onSnapshot)
+              publishSnapshot(state)
             }
           }
         },
@@ -246,7 +251,7 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
 
       if (result.status === "error") {
         state.status = { type: "idle" }
-        publishSnapshot(state, input.onSnapshot)
+        publishSnapshot(state)
         const detail = result.result?.trim()
         return yield* new PromptError({
           sessionId: input.sessionId,
@@ -256,7 +261,7 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       }
 
       state.status = { type: "idle" }
-      publishSnapshot(state, input.onSnapshot)
+      publishSnapshot(state)
     })
 
     yield* Effect.addFinalizer(() =>

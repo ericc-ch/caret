@@ -1,10 +1,13 @@
-import { For, type Accessor } from "solid-js"
-import type { ChatBubble } from "./state.ts"
+import { useAtomValue } from "@effect/atom-solid"
+import { For } from "solid-js"
+import { sessionSnapshotAtom } from "../../reactivity/atoms.ts"
 import { ChatBubbleView } from "./chat-bubble.tsx"
 import { useTheme } from "../../lib/theme.tsx"
 
-export function ChatView(props: { bubbles: Accessor<Array<ChatBubble>> }) {
+export function ChatView() {
   const { theme } = useTheme()
+  const snapshot = useAtomValue(() => sessionSnapshotAtom)
+  const bubbles = () => snapshot()?.messages ?? []
 
   return (
     <scrollbox
@@ -22,7 +25,7 @@ export function ChatView(props: { bubbles: Accessor<Array<ChatBubble>> }) {
       }}
     >
       <box height={1} />
-      <For each={props.bubbles()}>
+      <For each={bubbles()}>
         {(bubble, index) => <ChatBubbleView bubble={bubble} index={index()} />}
       </For>
     </scrollbox>

@@ -1,9 +1,9 @@
-import type { ChatBubble } from "./state.ts"
+import type { SessionMessage } from "../../services/session.ts"
 import { AssistantBubble } from "./assistant-bubble.tsx"
 import { ThinkingBubble } from "./thinking-bubble.tsx"
 import { UserBubble } from "./user-bubble.tsx"
 
-export function ChatBubbleView(props: { bubble: ChatBubble; index: number }) {
+export function ChatBubbleView(props: { bubble: SessionMessage; index: number }) {
   switch (props.bubble.role) {
     case "user":
       return <UserBubble text={props.bubble.text} index={props.index} />
