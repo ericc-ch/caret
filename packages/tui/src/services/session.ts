@@ -1,8 +1,10 @@
 import process from "node:process"
 import { Agent, type Run, type SDKAgent } from "@cursor/sdk"
 import { Context, Effect, Layer, Ref, Schema } from "effect"
+import { formatError } from "../lib/format-error.ts"
 import { appRegistry } from "../reactivity/registry.tsx"
 import { sessionSnapshotAtom } from "../reactivity/atoms.ts"
+import type { Transcript } from "../scrollback/transcript.tsx"
 
 export type SessionId = string
 
@@ -15,15 +17,9 @@ export type SessionInfo = {
   agentId: string
 }
 
-export type SessionMessage =
-  | { role: "user"; text: string }
-  | { role: "assistant"; text: string; streaming: boolean }
-  | { role: "thinking"; text: string; streaming: boolean }
-
 export type SessionSnapshot = {
   sessionId: SessionId
   status: SessionStatus
-  messages: ReadonlyArray<SessionMessage>
 }
 
 export type SessionEvent = { type: "snapshot"; snapshot: SessionSnapshot }
@@ -45,7 +41,6 @@ export class PromptError extends Schema.TaggedErrorClass<PromptError>()("PromptE
 type SessionState = {
   info: SessionInfo
   status: SessionStatus
-  messages: Array<SessionMessage>
   agent: SDKAgent
   currentRun: Run | null
 }
@@ -53,6 +48,7 @@ type SessionState = {
 type PromptInput = {
   sessionId: SessionId
   text: string
+  sink: Transcript
 }
 
 export type SessionInterface = {
@@ -62,7 +58,6 @@ export type SessionInterface = {
   readonly prompt: (input: PromptInput) => Effect.Effect<void, SessionNotFound | PromptError>
   readonly interrupt: (sessionId: SessionId) => Effect.Effect<void, SessionNotFound>
   readonly status: (sessionId: SessionId) => Effect.Effect<SessionStatus, SessionNotFound>
-  readonly messages: (sessionId: SessionId) => Effect.Effect<ReadonlyArray<SessionMessage>, SessionNotFound>
   readonly events: (sessionId: SessionId) => Effect.Effect<SessionEvent, SessionNotFound>
 }
 
@@ -78,7 +73,6 @@ function snapshot(state: SessionState): SessionSnapshot {
   return {
     sessionId: state.info.id,
     status: state.status,
-    messages: [...state.messages],
   }
 }
 
@@ -93,6 +87,21 @@ function agentOptions() {
     model: { id: "composer-2.5" as const },
     local: { cwd: process.cwd() },
   }
+}
+
+function failPrompt(input: {
+  state: SessionState
+  sink: Transcript
+  runId?: string
+  cause?: unknown
+  detail?: string
+}): PromptError {
+  const detail = input.detail ?? formatError(input.cause)
+  input.sink.writeError(detail)
+  input.state.status = { type: "idle" }
+  input.state.currentRun = null
+  publishSnapshot(input.state)
+  return new PromptError({ sessionId: input.state.info.id, runId: input.runId, detail })
 }
 
 export class Session extends Context.Service<Session, SessionInterface>()("@caret/Session", {
@@ -123,7 +132,6 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       const state: SessionState = {
         info,
         status: { type: "idle" },
-        messages: [],
         agent,
         currentRun: null,
       }
@@ -156,11 +164,6 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       return state.status
     })
 
-    const messages = Effect.fn("Session.messages")(function* (sessionId: SessionId) {
-      const state = yield* getState(sessionId)
-      return [...state.messages]
-    })
-
     const events = Effect.fn("Session.events")(function* (sessionId: SessionId) {
       const state = yield* getState(sessionId)
       return { type: "snapshot" as const, snapshot: snapshot(state) }
@@ -180,19 +183,25 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       const state = yield* getState(input.sessionId)
 
       state.status = { type: "busy" }
-      state.messages.push({ role: "user", text: input.text })
       publishSnapshot(state)
 
-      let assistantIndex: number | undefined
-      let thinkingIndex: number | undefined
+      const sink = input.sink
+      sink.writeUser(input.text)
+
+      let assistantText = ""
+      let thinkingText = ""
+      let sawThinking = false
+      let sawAssistant = false
+
+      const finalizeStreams = () => {
+        if (sawThinking) sink.updateThinking(thinkingText, true)
+        if (sawAssistant) sink.updateAssistant(assistantText, true)
+        sink.finish()
+      }
 
       const run = yield* Effect.tryPromise({
         try: () => state.agent.send(input.text),
-        catch: (cause) =>
-          new PromptError({
-            sessionId: input.sessionId,
-            detail: cause instanceof Error ? cause.message : String(cause),
-          }),
+        catch: (cause) => failPrompt({ state, sink, cause }),
       })
 
       state.currentRun = run
@@ -206,57 +215,40 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
                 .join("")
               if (!text) continue
 
-              assistantIndex ??= state.messages.push({ role: "assistant", text: "", streaming: true }) - 1
-              const message = state.messages[assistantIndex]
-              if (message?.role === "assistant") message.text += text
-              publishSnapshot(state)
+              assistantText += text
+              sawAssistant = true
+              sink.updateAssistant(assistantText, false)
             }
 
             if (event.type === "thinking" && event.text) {
-              thinkingIndex ??= state.messages.push({ role: "thinking", text: "", streaming: true }) - 1
-              const message = state.messages[thinkingIndex]
-              if (message?.role === "thinking") message.text = event.text
-              publishSnapshot(state)
+              thinkingText = event.text
+              sawThinking = true
+              sink.updateThinking(thinkingText, false)
             }
           }
         },
-        catch: (cause) =>
-          new PromptError({
-            sessionId: input.sessionId,
-            runId: run.id,
-            detail: cause instanceof Error ? cause.message : String(cause),
-          }),
+        catch: (cause) => {
+          finalizeStreams()
+          return failPrompt({ state, sink, runId: run.id, cause })
+        },
       })
+
+      finalizeStreams()
 
       const result = yield* Effect.tryPromise({
         try: () => run.wait(),
-        catch: (cause) =>
-          new PromptError({
-            sessionId: input.sessionId,
-            runId: run.id,
-            detail: cause instanceof Error ? cause.message : String(cause),
-          }),
+        catch: (cause) => failPrompt({ state, sink, runId: run.id, cause }),
       })
 
       if (state.currentRun === run) state.currentRun = null
 
-      if (assistantIndex !== undefined) {
-        const message = state.messages[assistantIndex]
-        if (message?.role === "assistant") message.streaming = false
-      }
-      if (thinkingIndex !== undefined) {
-        const message = state.messages[thinkingIndex]
-        if (message?.role === "thinking") message.streaming = false
-      }
-
       if (result.status === "error") {
-        state.status = { type: "idle" }
-        publishSnapshot(state)
-        const detail = result.result?.trim()
-        return yield* new PromptError({
-          sessionId: input.sessionId,
+        const trimmed = result.result?.trim()
+        return yield* failPrompt({
+          state,
+          sink,
           runId: run.id,
-          detail: detail || undefined,
+          ...(trimmed ? { detail: trimmed } : { cause: result }),
         })
       }
 
@@ -282,7 +274,6 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       prompt,
       interrupt,
       status,
-      messages,
       events,
     }
   }),

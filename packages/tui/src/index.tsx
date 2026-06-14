@@ -1,11 +1,7 @@
-import { extend, render } from "@opentui/solid"
-import { SpinnerRenderable } from "opentui-spinner"
-import "opentui-spinner/solid" // JSX types; register on root catalogue below
+import { render } from "@opentui/solid"
 import { App } from "./app.tsx"
 import { AppRegistryProvider } from "./reactivity/registry.tsx"
 import { ThemeProvider } from "./lib/theme.tsx"
-
-extend({ spinner: SpinnerRenderable })
 
 render(
   () => (
@@ -15,5 +11,13 @@ render(
       </AppRegistryProvider>
     </ThemeProvider>
   ),
-  { exitOnCtrlC: true },
+  {
+    screenMode: "split-footer",
+    footerHeight: 3,
+    externalOutputMode: "capture-stdout",
+    consoleMode: "disabled",
+    openConsoleOnError: false,
+    autoFocus: false,
+    exitOnCtrlC: true,
+  },
 )
