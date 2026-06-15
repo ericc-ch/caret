@@ -50,6 +50,7 @@ export function App() {
     try {
       await runtime
         .runPromise(Session.use((session) => session.prompt({ text, sink })))
+        // PromptError is already written to the transcript sink internally inside Session.prompt
         .catch(() => undefined)
     } finally {
       setRunning(false)

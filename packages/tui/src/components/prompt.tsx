@@ -1,6 +1,6 @@
 import type { KeyBinding, TextareaRenderable } from "@opentui/core"
+import { AtomRef } from "effect/unstable/reactivity"
 import { createEffect, on, onCleanup } from "solid-js"
-import { promptRef } from "../reactivity/prompt-ref.ts"
 import { useTheme } from "../lib/theme.tsx"
 
 const keyBindings = [
@@ -15,6 +15,8 @@ export type PromptRef = {
   focus(): void
   blur(): void
 }
+
+export const promptRef = AtomRef.make<PromptRef | undefined>(undefined)
 
 export function Prompt(props: { status: PromptStatus; onSubmit: (text: string) => void }) {
   const { theme } = useTheme()

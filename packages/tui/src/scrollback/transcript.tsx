@@ -20,10 +20,6 @@ export type Transcript = {
   dispose(): void
 }
 
-function thinkingColor(theme: Theme) {
-  const warning = theme.warning
-  return RGBA.fromValues(warning.r, warning.g, warning.b, theme.thinkingOpacity)
-}
 
 export function createTranscript(renderer: CliRenderer, theme: () => Theme): Transcript {
   let active: ActiveStream | undefined
@@ -123,7 +119,10 @@ export function createTranscript(renderer: CliRenderer, theme: () => Theme): Tra
 
     updateThinking(text: string, done: boolean) {
       const content = text ? `Thinking: ${text}` : "Thinking:"
-      updateStream({ kind: "thinking", content, done, fg: thinkingColor(theme()) })
+      const resolved = theme()
+      const warning = resolved.warning
+      const fg = RGBA.fromValues(warning.r, warning.g, warning.b, resolved.thinkingOpacity)
+      updateStream({ kind: "thinking", content, done, fg })
     },
 
     updateAssistant(text: string, done: boolean) {
