@@ -9,7 +9,6 @@
   },
   "dependencies": {
     "@cursor/sdk": "^1.0.18",
-    "@effect/atom-solid": "catalog:effect",
     "effect": "catalog:effect",
     "@opentui/core": "catalog:opentui",
     "@opentui/solid": "catalog:opentui",

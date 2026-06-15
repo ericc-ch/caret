@@ -1,7 +1,7 @@
 import type { KeyBinding, TextareaRenderable } from "@opentui/core"
 import { createEffect, on, onCleanup } from "solid-js"
-import { promptRef } from "../../reactivity/prompt-ref.ts"
-import { useTheme } from "../../lib/theme.tsx"
+import { promptRef } from "../reactivity/prompt-ref.ts"
+import { useTheme } from "../lib/theme.tsx"
 
 const keyBindings = [
   { name: "return", action: "submit" },
