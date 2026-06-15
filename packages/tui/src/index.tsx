@@ -11,10 +11,5 @@ render(
   {
     screenMode: "split-footer",
     footerHeight: 3,
-    externalOutputMode: "capture-stdout",
-    consoleMode: "disabled",
-    openConsoleOnError: false,
-    autoFocus: false,
-    exitOnCtrlC: true,
   },
 )

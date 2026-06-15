@@ -2,7 +2,7 @@ import process from "node:process"
 import { Agent, type SDKAgent } from "@cursor/sdk"
 import { Context, Effect, Layer, Ref, Schema } from "effect"
 import { formatError } from "../lib/format-error.ts"
-import type { Transcript } from "../scrollback/transcript.tsx"
+import { Scrollback, type StreamCommit } from "../scrollback/scrollback.tsx"
 
 export type AgentId = string
 
@@ -19,13 +19,12 @@ export class PromptError extends Schema.TaggedErrorClass<PromptError>()("PromptE
 }) {}
 
 type PromptInput = {
-  text: string
-  sink: Transcript
+  readonly text: string
 }
 
 export type SessionInterface = {
   readonly create: () => Effect.Effect<AgentId, AgentStartError>
-  readonly prompt: (input: PromptInput) => Effect.Effect<void, AgentNotActive | PromptError>
+  readonly prompt: (input: PromptInput) => Effect.Effect<void, AgentNotActive | PromptError, Scrollback>
 }
 
 function agentOptions() {
@@ -38,15 +37,15 @@ function agentOptions() {
 }
 
 function failPrompt(input: {
+  scrollback: { append: (commit: StreamCommit) => void }
   agentId: string
-  sink: Transcript
   runId?: string
   cause?: unknown
   detail?: string
-}): PromptError {
-  const detail = input.detail ?? formatError(input.cause)
-  input.sink.writeError(detail)
-  return new PromptError({ agentId: input.agentId, runId: input.runId, detail })
+}) {
+  const msg = input.detail ?? formatError(input.cause)
+  input.scrollback.append({ _tag: "Error", text: msg })
+  return new PromptError({ agentId: input.agentId, runId: input.runId, detail: msg })
 }
 
 export class Session extends Context.Service<Session, SessionInterface>()("@caret/Session", {
@@ -74,25 +73,14 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       const current = yield* Ref.get(agent)
       if (!current) return yield* new AgentNotActive()
 
-      const sink = input.sink
+      const scrollback = yield* Scrollback
       const agentId = current.agentId
 
-      sink.writeUser(input.text)
-
-      let assistantText = ""
-      let thinkingText = ""
-      let sawThinking = false
-      let sawAssistant = false
-
-      const finalizeStreams = () => {
-        if (sawThinking) sink.updateThinking(thinkingText, true)
-        if (sawAssistant) sink.updateAssistant(assistantText, true)
-        sink.finish()
-      }
+      scrollback.append({ _tag: "User", text: input.text })
 
       const run = yield* Effect.tryPromise({
         try: () => current.send(input.text),
-        catch: (cause) => failPrompt({ agentId, sink, cause }),
+        catch: (cause) => failPrompt({ scrollback, agentId, cause }),
       })
 
       yield* Effect.tryPromise({
@@ -104,36 +92,32 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
                 .join("")
               if (!text) continue
 
-              assistantText += text
-              sawAssistant = true
-              sink.updateAssistant(assistantText, false)
+              scrollback.append({ _tag: "Assistant", text })
             }
 
             if (event.type === "thinking" && event.text) {
-              thinkingText = event.text
-              sawThinking = true
-              sink.updateThinking(thinkingText, false)
+              scrollback.append({ _tag: "Thinking", text: event.text })
             }
           }
         },
         catch: (cause) => {
-          finalizeStreams()
-          return failPrompt({ agentId, sink, runId: run.id, cause })
+          scrollback.finish()
+          return failPrompt({ scrollback, agentId, runId: run.id, cause })
         },
       })
 
-      finalizeStreams()
+      scrollback.finish()
 
       const result = yield* Effect.tryPromise({
         try: () => run.wait(),
-        catch: (cause) => failPrompt({ agentId, sink, runId: run.id, cause }),
+        catch: (cause) => failPrompt({ scrollback, agentId, runId: run.id, cause }),
       })
 
       if (result.status === "error") {
         const trimmed = result.result?.trim()
         return yield* failPrompt({
+          scrollback,
           agentId,
-          sink,
           runId: run.id,
           ...(trimmed ? { detail: trimmed } : { cause: result }),
         })
@@ -144,10 +128,8 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       Effect.gen(function* () {
         const current = yield* Ref.get(agent)
         if (!current) return
-        yield* Effect.sync(() => {
-          void current.close()
-        })
-      }),
+        yield* Effect.sync(() => void current.close())
+      })
     )
 
     return { create, prompt }

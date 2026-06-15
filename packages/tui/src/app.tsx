@@ -1,11 +1,11 @@
 import { useRenderer } from "@opentui/solid"
 import { createMemo, createSignal, onCleanup, onMount } from "solid-js"
 import { Prompt } from "./components/prompt.tsx"
-import { runtime } from "./lib/runtime.ts"
 import { useTheme } from "./lib/theme.tsx"
 import { formatError } from "./lib/format-error.ts"
-import { createTranscript, type Transcript } from "./scrollback/transcript.tsx"
+import { Scrollback } from "./scrollback/scrollback.tsx"
 import { Session } from "./services/session.ts"
+import { Effect, Layer, ManagedRuntime } from "effect"
 
 type BootState = "pending" | "ready" | "failed"
 
@@ -14,7 +14,7 @@ export function App() {
   const { theme } = useTheme()
   const [boot, setBoot] = createSignal<BootState>("pending")
   const [running, setRunning] = createSignal(false)
-  let transcript: Transcript | undefined
+  let runtime: ManagedRuntime.ManagedRuntime<Session | Scrollback, never> | undefined
 
   const promptStatus = createMemo(() => {
     if (running()) return "running"
@@ -24,33 +24,40 @@ export function App() {
   })
 
   onMount(() => {
-    transcript = createTranscript(renderer, theme)
+    const scrollbackLayer = Scrollback.makeLayer(renderer, theme)
+    const appLayer = Session.layer.pipe(Layer.provideMerge(scrollbackLayer))
+    const rt = ManagedRuntime.make(appLayer)
+    runtime = rt
 
     void (async () => {
       try {
-        await runtime.runPromise(Session.use((session) => session.create()))
+        await rt.runPromise(Session.use((session) => session.create()))
         setBoot("ready")
       } catch (cause) {
-        transcript?.writeError(formatError(cause))
+        await rt.runPromise(
+          Effect.gen(function* () {
+            const scrollback = yield* Scrollback
+            scrollback.append({ _tag: "Error", text: formatError(cause) })
+          })
+        )
         setBoot("failed")
       }
     })()
   })
 
   onCleanup(() => {
-    transcript?.dispose()
-    void runtime.dispose()
+    if (runtime) {
+      void runtime.dispose()
+    }
   })
 
   const submit = async (text: string) => {
-    const sink = transcript
-    if (boot() !== "ready" || running() || !sink) return
+    if (boot() !== "ready" || running() || !runtime) return
 
     setRunning(true)
     try {
       await runtime
-        .runPromise(Session.use((session) => session.prompt({ text, sink })))
-        // PromptError is already written to the transcript sink internally inside Session.prompt
+        .runPromise(Session.use((session) => session.prompt({ text })))
         .catch(() => undefined)
     } finally {
       setRunning(false)
