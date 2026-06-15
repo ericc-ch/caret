@@ -2,7 +2,8 @@ import process from "node:process"
 import { Agent, type SDKAgent } from "@cursor/sdk"
 import { Context, Effect, Layer, Ref, Schema } from "effect"
 import { formatError } from "../lib/format-error.ts"
-import { Scrollback, type StreamCommit } from "../scrollback/scrollback.tsx"
+import { Commit } from "../scrollback/stream-commit.ts"
+import type { Transcript } from "../scrollback/transcript.tsx"
 
 export type AgentId = string
 
@@ -20,11 +21,12 @@ export class PromptError extends Schema.TaggedErrorClass<PromptError>()("PromptE
 
 type PromptInput = {
   readonly text: string
+  readonly sink: Transcript
 }
 
 export type SessionInterface = {
   readonly create: () => Effect.Effect<AgentId, AgentStartError>
-  readonly prompt: (input: PromptInput) => Effect.Effect<void, AgentNotActive | PromptError, Scrollback>
+  readonly prompt: (input: PromptInput) => Effect.Effect<void, AgentNotActive | PromptError>
 }
 
 function agentOptions() {
@@ -37,15 +39,15 @@ function agentOptions() {
 }
 
 function failPrompt(input: {
-  scrollback: { append: (commit: StreamCommit) => void }
   agentId: string
+  sink: Transcript
   runId?: string
   cause?: unknown
   detail?: string
 }) {
-  const msg = input.detail ?? formatError(input.cause)
-  input.scrollback.append({ _tag: "Error", text: msg })
-  return new PromptError({ agentId: input.agentId, runId: input.runId, detail: msg })
+  const detail = input.detail ?? formatError(input.cause)
+  input.sink.commit(Commit.Error({ text: detail }))
+  return new PromptError({ agentId: input.agentId, runId: input.runId, detail })
 }
 
 export class Session extends Context.Service<Session, SessionInterface>()("@caret/Session", {
@@ -73,55 +75,72 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       const current = yield* Ref.get(agent)
       if (!current) return yield* new AgentNotActive()
 
-      const scrollback = yield* Scrollback
+      const sink = input.sink
       const agentId = current.agentId
 
-      scrollback.append({ _tag: "User", text: input.text })
+      sink.commit(Commit.User({ text: input.text }))
+
+      let assistantText = ""
+      let thinkingText = ""
+      let sawThinking = false
+      let sawAssistant = false
 
       const run = yield* Effect.tryPromise({
         try: () => current.send(input.text),
-        catch: (cause) => failPrompt({ scrollback, agentId, cause }),
+        catch: (cause) => failPrompt({ agentId, sink, cause }),
       })
 
-      yield* Effect.tryPromise({
-        try: async () => {
-          for await (const event of run.stream()) {
-            if (event.type === "assistant") {
-              const text = event.message.content
-                .flatMap((block) => (block.type === "text" ? [block.text] : []))
-                .join("")
-              if (!text) continue
+      yield* Effect.gen(function* () {
+        yield* Effect.tryPromise({
+          try: async () => {
+            for await (const event of run.stream()) {
+              if (event.type === "assistant") {
+                const text = event.message.content
+                  .flatMap((block) => (block.type === "text" ? [block.text] : []))
+                  .join("")
+                if (!text) continue
 
-              scrollback.append({ _tag: "Assistant", text })
+                assistantText += text
+                sawAssistant = true
+                sink.commit(Commit.Assistant({ text: assistantText, done: false }))
+              }
+
+              if (event.type === "thinking" && event.text) {
+                thinkingText = event.text
+                sawThinking = true
+                sink.commit(Commit.Thinking({ text: thinkingText, done: false }))
+              }
             }
-
-            if (event.type === "thinking" && event.text) {
-              scrollback.append({ _tag: "Thinking", text: event.text })
-            }
-          }
-        },
-        catch: (cause) => {
-          scrollback.finish()
-          return failPrompt({ scrollback, agentId, runId: run.id, cause })
-        },
-      })
-
-      scrollback.finish()
-
-      const result = yield* Effect.tryPromise({
-        try: () => run.wait(),
-        catch: (cause) => failPrompt({ scrollback, agentId, runId: run.id, cause }),
-      })
-
-      if (result.status === "error") {
-        const trimmed = result.result?.trim()
-        return yield* failPrompt({
-          scrollback,
-          agentId,
-          runId: run.id,
-          ...(trimmed ? { detail: trimmed } : { cause: result }),
+          },
+          catch: (cause) => failPrompt({ agentId, sink, runId: run.id, cause }),
         })
-      }
+
+        const result = yield* Effect.tryPromise({
+          try: () => run.wait(),
+          catch: (cause) => failPrompt({ agentId, sink, runId: run.id, cause }),
+        })
+
+        if (result.status === "error") {
+          const trimmed = result.result?.trim()
+          return yield* failPrompt({
+            agentId,
+            sink,
+            runId: run.id,
+            ...(trimmed ? { detail: trimmed } : { cause: result }),
+          })
+        }
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (sawThinking) {
+              sink.commit(Commit.Thinking({ text: thinkingText, done: true }))
+            }
+            if (sawAssistant) {
+              sink.commit(Commit.Assistant({ text: assistantText, done: true }))
+            }
+          }),
+        ),
+      )
     })
 
     yield* Effect.addFinalizer(() =>

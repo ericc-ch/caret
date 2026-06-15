@@ -19,6 +19,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@cursor/sdk": "^1.0.18",
+        "@effect/atom-solid": "catalog:effect",
         "@opentui/core": "catalog:opentui",
         "@opentui/solid": "catalog:opentui",
         "effect": "catalog:effect",
@@ -154,6 +155,8 @@
     "@cursor/sdk-linux-x64": ["@cursor/sdk-linux-x64@1.0.18", "", { "os": "linux", "cpu": "x64", "bin": { "rg": "bin/rg" } }, "sha512-IaJqcKtXxtQEdPxivQjDWbvynw3UX31V8RdagcZ6RgHOo+B/i/P95D8svSNC4V9nbTHwVbNGfIDQ5S64gMS2hg=="],
 
     "@cursor/sdk-win32-x64": ["@cursor/sdk-win32-x64@1.0.18", "", { "os": "win32", "cpu": "x64", "bin": { "rg": "bin/rg.exe" } }, "sha512-iqcGt1l/3xgnaT+PotY3237oyK3VnOZHtjUxSRP3Q7ahjaqsZVTnCwwljj+nal8ouvXidBHnxQLqGMSC2G6LTg=="],
+
+    "@effect/atom-solid": ["@effect/atom-solid@4.0.0-beta.83", "", { "peerDependencies": { "effect": "^4.0.0-beta.83", "solid-js": ">=1 <2" } }, "sha512-ctAgVTKRLqpE9BZjNwWVZJUlGBJ0WBXp2pTYSymwC4SYSi7Kg73vhbFTTdhLMrUjbecoEXRc2WA5XRRnHd/XoA=="],
 
     "@effect/language-service": ["@effect/language-service@0.86.2", "", { "bin": { "effect-language-service": "cli.js" } }, "sha512-SaPln+8srOqDJDUwNTDmP5e+IYpEDr9+1epGznnsLqu8xvo6VnxyWARdeLpqvZJlb0Pgy9ca7ppqvvdWbHPXAg=="],
 

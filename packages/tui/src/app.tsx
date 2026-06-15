@@ -1,68 +1,73 @@
 import { useRenderer } from "@opentui/solid"
-import { createMemo, createSignal, onCleanup, onMount } from "solid-js"
+import { useAtom, useAtomValue } from "@effect/atom-solid"
+import { Atom } from "effect/unstable/reactivity"
+import { Effect } from "effect"
+import { onCleanup, onMount } from "solid-js"
 import { Prompt } from "./components/prompt.tsx"
+import { runtime } from "./lib/runtime.ts"
 import { useTheme } from "./lib/theme.tsx"
 import { formatError } from "./lib/format-error.ts"
-import { Scrollback } from "./scrollback/scrollback.tsx"
+import { Commit } from "./scrollback/stream-commit.ts"
+import { createTranscript, type Transcript } from "./scrollback/transcript.tsx"
 import { Session } from "./services/session.ts"
-import { Effect, Layer, ManagedRuntime } from "effect"
 
 type BootState = "pending" | "ready" | "failed"
+
+const bootAtom = Atom.make<BootState>("pending")
+const transcriptAtom = Atom.make<Transcript | undefined>(undefined)
+
+const submitAtom = Atom.fn<string>()((text: string, get) => {
+  const boot = get.registry.get(bootAtom)
+  const sink = get.registry.get(transcriptAtom)
+  if (boot !== "ready" || !sink) {
+    return Effect.void
+  }
+
+  return Effect.flatMap(runtime.contextEffect, (context) =>
+    Effect.provide(
+      Session.use((session) => session.prompt({ text, sink })),
+      context,
+    ),
+  ).pipe(Effect.catch(() => Effect.void))
+})
+
+const promptStatusAtom = Atom.readable((get) => {
+  const boot = get(bootAtom)
+  const submitResult = get(submitAtom)
+  if (submitResult.waiting) return "running"
+  if (boot === "pending") return "connecting"
+  if (boot === "failed") return "unavailable"
+  return "ready"
+})
 
 export function App() {
   const renderer = useRenderer()
   const { theme } = useTheme()
-  const [boot, setBoot] = createSignal<BootState>("pending")
-  const [running, setRunning] = createSignal(false)
-  let runtime: ManagedRuntime.ManagedRuntime<Session | Scrollback, never> | undefined
+  const [, setBoot] = useAtom(() => bootAtom)
+  const [getTranscript, setTranscript] = useAtom(() => transcriptAtom)
+  const [, submit] = useAtom(() => submitAtom)
 
-  const promptStatus = createMemo(() => {
-    if (running()) return "running"
-    if (boot() === "pending") return "connecting"
-    if (boot() === "failed") return "unavailable"
-    return "ready"
-  })
+  const promptStatus = useAtomValue(() => promptStatusAtom)
 
   onMount(() => {
-    const scrollbackLayer = Scrollback.makeLayer(renderer, theme)
-    const appLayer = Session.layer.pipe(Layer.provideMerge(scrollbackLayer))
-    const rt = ManagedRuntime.make(appLayer)
-    runtime = rt
+    const transcript = createTranscript(renderer, theme)
+    setTranscript(transcript)
 
     void (async () => {
       try {
-        await rt.runPromise(Session.use((session) => session.create()))
+        await runtime.runPromise(Session.use((session) => session.create()))
         setBoot("ready")
       } catch (cause) {
-        await rt.runPromise(
-          Effect.gen(function* () {
-            const scrollback = yield* Scrollback
-            scrollback.append({ _tag: "Error", text: formatError(cause) })
-          }),
-        )
+        getTranscript()?.commit(Commit.Error({ text: formatError(cause) }))
         setBoot("failed")
       }
     })()
   })
 
   onCleanup(() => {
-    if (runtime) {
-      void runtime.dispose()
-    }
+    getTranscript()?.dispose()
+    void runtime.dispose()
   })
-
-  const submit = async (text: string) => {
-    if (boot() !== "ready" || running() || !runtime) return
-
-    setRunning(true)
-    try {
-      await runtime
-        .runPromise(Session.use((session) => session.prompt({ text })))
-        .catch(() => undefined)
-    } finally {
-      setRunning(false)
-    }
-  }
 
   return (
     <box flexDirection="column" width="100%" height="100%" backgroundColor={theme().background}>
