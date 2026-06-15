@@ -22,10 +22,10 @@ The user explicitly does **not** want to match the screenshot pixel-perfect at t
 
 **Yes, OpenTUI supports this.** Use `screenMode: "split-footer"` with `externalOutputMode: "capture-stdout"`.
 
-| Lane | Responsibility |
-|------|----------------|
+| Lane                   | Responsibility                                                            |
+| ---------------------- | ------------------------------------------------------------------------- |
 | **Scrollback (above)** | Append-only transcript via `writeToScrollback` / `createScrollbackWriter` |
-| **Footer (below)** | Mutable Solid UI: prompt, status, later permissions/menus |
+| **Footer (below)**     | Mutable Solid UI: prompt, status, later permissions/menus                 |
 
 OpenCode’s `opencode run --interactive` is the reference implementation — same scrollback look as non-interactive `run`, plus live footer.
 
@@ -33,11 +33,11 @@ OpenCode’s `opencode run --interactive` is the reference implementation — sa
 
 ## Screen mode decision
 
-| Mode | Verdict for caret minimal |
-|------|---------------------------|
+| Mode               | Verdict for caret minimal                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------ |
 | `alternate-screen` | Current caret default. Requires `scrollbox` + `stickyScroll`. **Reject** for minimal mode. |
-| `main-screen` | Not true native scrollback. **Reject.** |
-| `split-footer` | Terminal owns scroll; footer pinned. **Use this.** |
+| `main-screen`      | Not true native scrollback. **Reject.**                                                    |
+| `split-footer`     | Terminal owns scroll; footer pinned. **Use this.**                                         |
 
 OpenTUI docs: `.references/opentui/packages/web/src/content/docs/core-concepts/renderer.mdx` (Screen modes, Writing to scrollback).
 
@@ -47,16 +47,16 @@ OpenTUI docs: `.references/opentui/packages/web/src/content/docs/core-concepts/r
 
 Do **not** port OpenCode’s SDK/sync layer. Borrow layout and scrollback patterns only.
 
-| Path | Why |
-|------|-----|
-| `packages/opencode/src/cli/cmd/run/runtime.lifecycle.ts` | Boots `split-footer` renderer (`footerHeight: 4`, `capture-stdout`) |
-| `packages/opencode/src/cli/cmd/run/types.ts` | Two-lane model: `StreamCommit` → scrollback, `FooterOutput` → footer |
-| `packages/opencode/src/cli/cmd/run/footer.ts` | `RunFooter` — mutable footer, append-only scrollback boundary |
-| `packages/opencode/src/cli/cmd/run/scrollback.writer.tsx` | Static scrollback entries (Solid `createScrollbackWriter`) |
-| `packages/opencode/src/cli/cmd/run/scrollback.surface.ts` | Streaming assistant/reasoning/tool progress |
-| `packages/opencode/src/cli/cmd/run/entry.body.ts` | `Thinking:` reasoning → dim markdown in scrollback |
-| `packages/opencode/src/cli/cmd/run/footer.view.tsx` | Footer layout: composer + statusline; expands for menus |
-| `packages/opencode/src/cli/cmd/run/footer.prompt.tsx` | Interactive prompt state machine |
+| Path                                                      | Why                                                                  |
+| --------------------------------------------------------- | -------------------------------------------------------------------- |
+| `packages/opencode/src/cli/cmd/run/runtime.lifecycle.ts`  | Boots `split-footer` renderer (`footerHeight: 4`, `capture-stdout`)  |
+| `packages/opencode/src/cli/cmd/run/types.ts`              | Two-lane model: `StreamCommit` → scrollback, `FooterOutput` → footer |
+| `packages/opencode/src/cli/cmd/run/footer.ts`             | `RunFooter` — mutable footer, append-only scrollback boundary        |
+| `packages/opencode/src/cli/cmd/run/scrollback.writer.tsx` | Static scrollback entries (Solid `createScrollbackWriter`)           |
+| `packages/opencode/src/cli/cmd/run/scrollback.surface.ts` | Streaming assistant/reasoning/tool progress                          |
+| `packages/opencode/src/cli/cmd/run/entry.body.ts`         | `Thinking:` reasoning → dim markdown in scrollback                   |
+| `packages/opencode/src/cli/cmd/run/footer.view.tsx`       | Footer layout: composer + statusline; expands for menus              |
+| `packages/opencode/src/cli/cmd/run/footer.prompt.tsx`     | Interactive prompt state machine                                     |
 
 **Not** the right reference for minimal mode: `packages/tui/` (full alternate-screen TUI with `kv.signal` toggles). OpenCode has no single “minimal UI mode” preset there — only granular visibility flags and collapsed thinking (`thinkingMode === "hide"`, legacy name `"minimal"`).
 
@@ -68,12 +68,12 @@ Entry: `src/index.tsx` — `render()` with default `alternate-screen`.
 
 Layout: `src/app.tsx` — column with `ChatView` (scrollbox) + `Prompt` in the same tree.
 
-| File | Role |
-|------|------|
-| `src/components/chat/chat-view.tsx` | `scrollbox` + `stickyScroll` + `stickyStart="bottom"` |
-| `src/components/prompt/prompt.tsx` | Interactive textarea (keep; move to footer) |
-| `src/components/chat/*.tsx` | Bubble components — may inform scrollback styling or be replaced by log-style writers |
-| `src/services/session.ts` | SDK session + message model |
+| File                                | Role                                                                                  |
+| ----------------------------------- | ------------------------------------------------------------------------------------- |
+| `src/components/chat/chat-view.tsx` | `scrollbox` + `stickyScroll` + `stickyStart="bottom"`                                 |
+| `src/components/prompt/prompt.tsx`  | Interactive textarea (keep; move to footer)                                           |
+| `src/components/chat/*.tsx`         | Bubble components — may inform scrollback styling or be replaced by log-style writers |
+| `src/services/session.ts`           | SDK session + message model                                                           |
 
 No split-footer or scrollback writer code exists yet.
 

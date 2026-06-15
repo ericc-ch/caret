@@ -38,7 +38,7 @@ export function App() {
           Effect.gen(function* () {
             const scrollback = yield* Scrollback
             scrollback.append({ _tag: "Error", text: formatError(cause) })
-          })
+          }),
         )
         setBoot("failed")
       }

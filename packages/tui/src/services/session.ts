@@ -129,7 +129,7 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
         const current = yield* Ref.get(agent)
         if (!current) return
         yield* Effect.sync(() => void current.close())
-      })
+      }),
     )
 
     return { create, prompt }

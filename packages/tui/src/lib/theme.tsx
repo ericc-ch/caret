@@ -298,7 +298,9 @@ export function generateSyntax(theme: Theme): SyntaxStyle {
   ])
 }
 
-async function loadTheme(renderer: { getPalette(options?: { size?: number }): Promise<TerminalColors> }): Promise<Theme> {
+async function loadTheme(renderer: {
+  getPalette(options?: { size?: number }): Promise<TerminalColors>
+}): Promise<Theme> {
   try {
     const colors = await renderer.getPalette({ size: 16 })
     if (!colors.palette[0]) return FALLBACK_THEME
@@ -328,9 +330,5 @@ export function ThemeProvider(props: ParentProps): JSX.Element {
     })
   })
 
-  return (
-    <ThemeContext.Provider value={{ theme, syntax }}>
-      {props.children}
-    </ThemeContext.Provider>
-  )
+  return <ThemeContext.Provider value={{ theme, syntax }}>{props.children}</ThemeContext.Provider>
 }
