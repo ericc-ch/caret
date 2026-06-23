@@ -1,6 +1,10 @@
 {
   "files": [],
-  "references": [{ "path": "./packages/tui/" }, { "path": "./tsconfig.tools.json" }],
+  "references": [
+    { "path": "./packages/agent/" },
+    { "path": "./packages/tui/" },
+    { "path": "./tsconfig.tools.json" }
+  ],
 
   "compilerOptions": {
     "target": "ESNext",

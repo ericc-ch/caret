@@ -1,0 +1,21 @@
+{
+  "name": "@caret/agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "caret-agent": "./src/cli.ts"
+  },
+  "scripts": {
+    "dev": "bun run --watch src/cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cursor/sdk": "^1.0.18",
+    "env-paths": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@types/node": "catalog:"
+  }
+}

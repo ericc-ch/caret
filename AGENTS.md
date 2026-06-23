@@ -51,6 +51,11 @@ Available references:
 - opentui — OpenTUI (terminal UI framework)
 - opencode — OpenCode (TUI UI reference; uses OpenTUI in production)
 - cursor-cookbook — Cursor SDK docs and examples (SDK itself is not open source)
+- playwright — Playwright API reference
+- executor — QuickJS engine, tools.\*, pause/elicitation, MCP host (RhysSullivan/executor)
+- playwriter — Code REPL + VM sandbox for browser automation (reference only)
+- agent-browser — Agent-owned browser daemon, snapshot/ref CLI (vercel-labs)
+- openclaw — OpenClaw code mode (exec/wait + QuickJS-WASI; compare with Cloudflare codemode)
 
 Cursor SDK is not open source. See `.references/cursor-cookbook` for SDK docs and examples.
 
