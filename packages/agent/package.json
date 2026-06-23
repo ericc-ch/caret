@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@cursor/sdk": "^1.0.18",
+    "@effect/platform-node": "catalog:effect",
+    "effect": "catalog:effect",
     "env-paths": "^4.0.0"
   },
   "devDependencies": {

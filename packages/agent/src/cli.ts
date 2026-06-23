@@ -1,64 +1,60 @@
 #!/usr/bin/env bun
 
 import process from "node:process"
-import readline from "node:readline/promises"
 
-import { AgentSession } from "./cursor/session.ts"
-import { formatError } from "./lib/format-error.ts"
+import { NodeRuntime, NodeServices } from "@effect/platform-node"
+import { Effect, Layer, Terminal } from "effect"
 
-async function main() {
-  const session = new AgentSession()
-  await using _session = {
-    [Symbol.asyncDispose]: async () => {
-      await session.dispose()
-    },
-  }
+import { Agent } from "./lib/agent.ts"
+import { relayStream } from "./lib/stream.ts"
+import { ensureWorkspace } from "./lib/workspace.ts"
 
-  const agentId = await session.open()
-  process.stderr.write(`workspace: ${session.workspaceDir}\n`)
-  process.stderr.write(`agent: ${agentId}\n`)
-  process.stderr.write("caret-agent cli — type a message, empty line to quit\n\n")
+const MainLayer = Agent.layer.pipe(Layer.provideMerge(NodeServices.layer))
 
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+const program = Effect.gen(function* () {
+  yield* ensureWorkspace
+  const agent = yield* Agent
+  const terminal = yield* Terminal.Terminal
 
-  try {
-    while (true) {
-      const line = (await rl.question("> ")).trim()
-      if (!line) break
+  yield* terminal.display(`workspace: ${agent.workspaceDir}\n`)
+  yield* terminal.display(`agent: ${agent.agentId}\n`)
+  yield* terminal.display("caret-agent cli — type a message, empty line to quit\n\n")
 
-      let assistantStarted = false
+  while (true) {
+    yield* terminal.display("> ")
+    const line = (yield* terminal.readLine).trim()
+    if (!line) break
 
-      const result = await session.send(line, {
-        onText: (chunk) => {
-          if (!assistantStarted) {
-            process.stdout.write("\n")
-            assistantStarted = true
-          }
-          process.stdout.write(chunk)
-        },
-        onPause: (payload) => {
-          process.stderr.write(
-            `\n[pause] ${payload.interaction.message ?? payload.executionId}\n`,
-          )
-        },
-      })
+    let assistantStarted = false
 
-      if (assistantStarted) process.stdout.write("\n")
+    const run = yield* Effect.promise(() => agent.cursor.send(line))
+    yield* relayStream(run, {
+      onText: (chunk) => {
+        if (!assistantStarted) {
+          process.stdout.write("\n")
+          assistantStarted = true
+        }
+        process.stdout.write(chunk)
+      },
+      onPause: (payload) => {
+        process.stderr.write(`\n[pause] ${payload.interaction.message ?? payload.executionId}\n`)
+      },
+    })
+    const result = yield* Effect.promise(() => run.wait())
 
-      if (result.status === "error") {
-        process.stderr.write(`run error: ${result.detail ?? "Run failed"}\n`)
+    if (assistantStarted) process.stdout.write("\n")
+
+    if (result.status === "error") {
+      yield* terminal.display(`run error: ${result.result?.trim() || "Run failed"}\n`)
+      yield* Effect.sync(() => {
         process.exitCode = 2
-      } else {
-        process.stderr.write(`[${result.status}] run ${result.runId}\n`)
-      }
-      process.stdout.write("\n")
+      })
+    } else {
+      yield* terminal.display(`[${result.status}] run ${run.id}\n`)
     }
-  } finally {
-    rl.close()
-  }
-}
 
-main().catch((cause) => {
-  process.stderr.write(`error: ${formatError(cause)}\n`)
-  process.exitCode = 1
+    yield* terminal.display("\n")
+  }
 })
+
+program.pipe(Effect.provide(MainLayer), NodeRuntime.runMain)
