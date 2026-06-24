@@ -39,11 +39,11 @@ OpenCode’s `opencode run --interactive` is the reference implementation — sa
 | `main-screen`      | Not true native scrollback. **Reject.**                                                    |
 | `split-footer`     | Terminal owns scroll; footer pinned. **Use this.**                                         |
 
-OpenTUI docs: `.references/opentui/packages/web/src/content/docs/core-concepts/renderer.mdx` (Screen modes, Writing to scrollback).
+OpenTUI docs: `/tmp/references/opentui/packages/web/src/content/docs/core-concepts/renderer.mdx` (Screen modes, Writing to scrollback).
 
 ---
 
-## OpenCode reference map (read-only, `.references/`)
+## OpenCode reference map (read-only, `/tmp/references/`)
 
 Do **not** port OpenCode’s SDK/sync layer. Borrow layout and scrollback patterns only.
 

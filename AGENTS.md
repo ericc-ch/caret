@@ -32,7 +32,7 @@ When spawning Task subagents (review, explore, `/simplify`, etc.), **always** pa
 ## Architecture
 
 - `packages/tui` (`@caret/tui`) — Solid-based terminal frontend on OpenTUI. Owns the renderer, chat UI, prompt input, and `@cursor/sdk` wiring. No separate agent package for now; keep the SDK boundary inside `@caret/tui` until the surface stabilizes.
-- OpenCode (`.references/opencode`) is a **UI reference** for layout, themes, and component patterns — not a backend to port. Steal presentation ideas; do not copy its SDK/sync layer.
+- OpenCode (`/tmp/references/opencode`) is a **UI reference** for layout, themes, and component patterns — not a backend to port. Steal presentation ideas; do not copy its SDK/sync layer.
 
 ### Current focus
 
@@ -40,8 +40,8 @@ Build chat bubbles and the prompt first. Tool cards, permissions, and CLI packag
 
 ## References Directory
 
-The `.references/` directory contains shallow clones of important external repositories.
-Never make any changes in this directory, it is ignored by git and meant as reference only.
+The `/tmp/references/` directory contains shallow clones of important external repositories (populated by `bun scripts/references.ts`).
+Never make any changes in this directory — it is meant as reference only.
 
 Prefer exploring and reading this directory over searching for documentation. Think of it as the source of truth.
 
@@ -57,8 +57,8 @@ Available references:
 - agent-browser — Agent-owned browser daemon, snapshot/ref CLI (vercel-labs)
 - openclaw — OpenClaw code mode (exec/wait + QuickJS-WASI; compare with Cloudflare codemode)
 
-Cursor SDK is not open source. See `.references/cursor-cookbook` for SDK docs and examples.
+Cursor SDK is not open source. See `/tmp/references/cursor-cookbook` for SDK docs and examples.
 
 ## Idiomatic Effect (v4)
 
-Use `.references/effect-smol` as the source of truth (also `ai-docs/` inside it for patterns).
+Use `/tmp/references/effect-smol` as the source of truth (also `ai-docs/` inside it for patterns).

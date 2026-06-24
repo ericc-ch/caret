@@ -2,8 +2,7 @@
 
 import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readdirSync } from "node:fs"
-import { dirname, join } from "node:path"
-import { fileURLToPath } from "node:url"
+import { join } from "node:path"
 
 type ReferenceRepository = {
   readonly name: string
@@ -66,11 +65,9 @@ const repositories = [
   },
 ] satisfies ReadonlyArray<ReferenceRepository>
 
-const scriptDir = dirname(fileURLToPath(import.meta.url))
-const projectRoot = dirname(scriptDir)
-const referencesDir = join(projectRoot, ".references")
+const referencesDir = "/tmp/references"
 
-const run = (command: string, args: ReadonlyArray<string>, cwd = projectRoot) => {
+const run = (command: string, args: ReadonlyArray<string>, cwd = referencesDir) => {
   const result = spawnSync(command, args, { cwd, stdio: "inherit" })
 
   if (result.error) {
@@ -82,7 +79,7 @@ const run = (command: string, args: ReadonlyArray<string>, cwd = projectRoot) =>
   }
 }
 
-console.log("Setting up .references/ directory...")
+console.log("Setting up /tmp/references/ directory...")
 
 mkdirSync(referencesDir, { recursive: true })
 

@@ -51,7 +51,7 @@ Explored; deprioritized for v0:
 - Executor already does pause via **async suspension at tool boundary**, not bytecode debugger.
 - For **trusted browser + live Playwright**, Proxy/wrapper or separate node:vm path beats custom engine.
 
-### 5. Reference projects added to `.references/`
+### 5. Reference projects added to `/tmp/references/`
 
 Run `node scripts/references.ts` (also on `pnpm install` prepare):
 
@@ -167,7 +167,7 @@ Long-lived MCP process
 
 **Keep/evolve:** `executor-node-vm.ts`, `mcp.ts`, compile-code (amaro strip).
 
-**Reference impl:** `.references/playwriter/playwriter/src/executor.ts` (~1500 lines — copy patterns, don’t depend on package).
+**Reference impl:** `/tmp/references/playwriter/playwriter/src/executor.ts` (~1500 lines — copy patterns, don’t depend on package).
 
 **User browser hint:** `.runner/plugins/playwright.ts` uses `command -v helium` — direct CDP, **no extension/relay for v0**.
 
@@ -206,9 +206,9 @@ Long-lived MCP process
 
 - `engine.execute(code, { onElicitation })` — inline blocking approval
 - `engine.executeWithPause(code)` + `engine.resume(id, response)` — split (maps to MCP `execute`+`resume`; user may hide `resume` from model)
-- Guest code: `tools.search`, `tools.describe`, lazy `tools.*` proxy — see `.references/executor/packages/kernel/runtime-quickjs/src/index.ts`
+- Guest code: `tools.search`, `tools.describe`, lazy `tools.*` proxy — see `/tmp/references/executor/packages/kernel/runtime-quickjs/src/index.ts`
 
-**Private:** `@executor-js/host-mcp` — reference at `.references/executor/packages/hosts/mcp/src/tool-server.ts`
+**Private:** `@executor-js/host-mcp` — reference at `/tmp/references/executor/packages/hosts/mcp/src/tool-server.ts`
 
 **Effect:** used internally; Promise surface at `@executor-js/execution` root import.
 
@@ -305,12 +305,12 @@ Run `pnpm run check` before commit — was green after executor cleanup.
 | `src/lib/runner.ts` | Plugin loop — likely remove/shrink |
 | `src/lib/config.ts` | Plugin loading — likely remove/shrink |
 | `.runner/plugins/playwright.ts` | User Helium CDP stub |
-| `.references/playwriter/playwriter/src/executor.ts` | Sandbox bible |
-| `.references/playwriter/playwriter/src/mcp.ts` | MCP execute/reset |
-| `.references/agent-browser/cli/src/mcp.rs` | MCP + daemon pattern |
-| `.references/executor/packages/core/execution/src/engine.ts` | Pause/resume engine |
-| `.references/executor/packages/kernel/runtime-quickjs/src/index.ts` | QuickJS + tools proxy |
-| `.references/executor/packages/hosts/mcp/src/tool-server.ts` | Executor MCP server ref |
+| `/tmp/references/playwriter/playwriter/src/executor.ts` | Sandbox bible |
+| `/tmp/references/playwriter/playwriter/src/mcp.ts` | MCP execute/reset |
+| `/tmp/references/agent-browser/cli/src/mcp.rs` | MCP + daemon pattern |
+| `/tmp/references/executor/packages/core/execution/src/engine.ts` | Pause/resume engine |
+| `/tmp/references/executor/packages/kernel/runtime-quickjs/src/index.ts` | QuickJS + tools proxy |
+| `/tmp/references/executor/packages/hosts/mcp/src/tool-server.ts` | Executor MCP server ref |
 | `scripts/references.ts` | Clone/update references |
 | `AGENTS.md` | Agent instructions + references list |
 

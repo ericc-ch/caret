@@ -120,7 +120,7 @@ Executor's MCP server supports three elicitation modes:
 | **browser** | `--elicitation-mode browser` | Pause → browser URL → `resume` blocks | `execute` + `resume` |
 | **native** | Not exposed in CLI | `elicitInput` — fails if client unsupported | `execute` only |
 
-Cursor does not advertise MCP `elicitation` capability. Executor falls back to **pause/resume** (documented in `.references/executor/packages/hosts/mcp/src/tool-server.test.ts` — "client without elicitation").
+Cursor does not advertise MCP `elicitation` capability. Executor falls back to **pause/resume** (documented in `/tmp/references/executor/packages/hosts/mcp/src/tool-server.test.ts` — "client without elicitation").
 
 We use **model mode** because:
 
@@ -424,11 +424,11 @@ Do not assume approval. Always ask.
 
 | Path | Why |
 |---|---|
-| `.references/executor/packages/hosts/mcp/src/tool-server.ts` | MCP execute/resume, elicitation modes |
-| `.references/executor/packages/hosts/mcp/src/tool-server.test.ts` | "client without elicitation" tests |
-| `.references/executor/packages/core/execution/README.md` | Engine embed docs (reference only — we don't embed) |
-| `.references/openclaw/src/agents/code-mode.ts` | OpenClaw exec/wait comparison |
-| `.references/cursor-cookbook/sdk/` | Cursor SDK patterns |
+| `/tmp/references/executor/packages/hosts/mcp/src/tool-server.ts` | MCP execute/resume, elicitation modes |
+| `/tmp/references/executor/packages/hosts/mcp/src/tool-server.test.ts` | "client without elicitation" tests |
+| `/tmp/references/executor/packages/core/execution/README.md` | Engine embed docs (reference only — we don't embed) |
+| `/tmp/references/openclaw/src/agents/code-mode.ts` | OpenClaw exec/wait comparison |
+| `/tmp/references/cursor-cookbook/sdk/` | Cursor SDK patterns |
 | `HANDOFF.md` | Earlier runner/CursorClaw exploration (partially superseded by this plan) |
 
 ---

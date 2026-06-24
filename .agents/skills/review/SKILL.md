@@ -32,7 +32,7 @@ Launch the following five subagents **in parallel** with `model: "composer-2.5"`
 
 Pass the full combined diff when possible; if it is too large, pass the file list, relevant hunks, and a scope summary.
 
-Before launching, read [docs/conventions.md](../../../docs/conventions.md) and skim `.references/effect-smol/LLMS.md` (or relevant `ai-docs/src/**` sections) so subagent prompts can reference project rules.
+Before launching, read [docs/conventions.md](../../../docs/conventions.md) and skim `/tmp/references/effect-smol/LLMS.md` (or relevant `ai-docs/src/**` sections) so subagent prompts can reference project rules.
 
 ### 1. Code quality reviewer
 
@@ -76,7 +76,7 @@ Also respect [AGENTS.md](../../../AGENTS.md) for workspace tooling (Bun, `node:`
 
 ### 5. Effect idioms reviewer
 
-For Effect code in scope, check against `.references/effect-smol` (source of truth; do not use `node_modules` or external Effect docs):
+For Effect code in scope, check against `/tmp/references/effect-smol` (source of truth; do not use `node_modules` or external Effect docs):
 
 - prefer `Effect.gen` and `Effect.fn("name")` over combinator-only style
 - do not create functions that return `Effect.gen`; use `Effect.fn` instead
@@ -85,7 +85,7 @@ For Effect code in scope, check against `.references/effect-smol` (source of tru
 - use `Schema.TaggedErrorClass` for typed errors; `return yield*` when raising errors
 - match patterns in `ai-docs/src/**` for the relevant domain (streams, layers, errors, testing, etc.)
 
-Read `.references/effect-smol/LLMS.md` first; drill into `ai-docs/src/` examples when the scoped code touches a specific area.
+Read `/tmp/references/effect-smol/LLMS.md` first; drill into `ai-docs/src/` examples when the scoped code touches a specific area.
 
 ## Fixing
 
