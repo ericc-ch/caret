@@ -63,6 +63,11 @@ const repositories = [
     directory: "openclaw",
     url: "https://github.com/openclaw/openclaw.git",
   },
+  {
+    name: "discord.js",
+    directory: "discord.js",
+    url: "https://github.com/discordjs/discord.js.git",
+  },
 ] satisfies ReadonlyArray<ReferenceRepository>
 
 const referencesDir = "/tmp/references"

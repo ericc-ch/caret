@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "executor": {
+      "type": "stdio",
+      "command": "executor",
+      "args": [
+        "mcp",
+        "--elicitation-mode",
+        "model",
+        "--scope",
+        "${workspaceFolder}"
+      ]
+    }
+  }
+}

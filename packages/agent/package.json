@@ -8,11 +8,13 @@
   },
   "scripts": {
     "dev": "bun run --watch src/cli.ts",
+    "dev:discord": "bun run --watch src/main.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@cursor/sdk": "^1.0.18",
     "@effect/platform-node": "catalog:effect",
+    "discord.js": "^14.22.1",
     "effect": "catalog:effect",
     "env-paths": "^4.0.0"
   },

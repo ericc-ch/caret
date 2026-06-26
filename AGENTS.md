@@ -1,4 +1,4 @@
-caret is an alternative terminal frontend for Cursor.
+caret is a monorepo for Cursor-powered agents.
 
 The agent backend is [`@cursor/sdk`](https://cursor.com/docs/sdk/typescript) — local agents via `Agent.create()` and `run.stream()`. Do not use ACP (`agent acp`) or other Cursor CLI protocols.
 
@@ -27,16 +27,13 @@ When spawning Task subagents (review, explore, `/simplify`, etc.), **always** pa
 
 ## Workspace
 
-- `packages/tui` — OpenTUI Solid frontend and Cursor SDK integration (`@caret/tui`)
+- `packages/agent` — multi-channel agent host (`@caret/agent`); **current focus**
+- `packages/tui` — OpenTUI Solid terminal frontend (`@caret/tui`); paused
 
 ## Architecture
 
-- `packages/tui` (`@caret/tui`) — Solid-based terminal frontend on OpenTUI. Owns the renderer, chat UI, prompt input, and `@cursor/sdk` wiring. No separate agent package for now; keep the SDK boundary inside `@caret/tui` until the surface stabilizes.
-- OpenCode (`/tmp/references/opencode`) is a **UI reference** for layout, themes, and component patterns — not a backend to port. Steal presentation ideas; do not copy its SDK/sync layer.
-
-### Current focus
-
-Build chat bubbles and the prompt first. Tool cards, permissions, and CLI packaging come later.
+- `packages/agent` (`@caret/agent`) — personal multi-channel host (OpenClaw-shaped): chat platforms in, Cursor SDK as the brain, **executor** as the code/tools engine via MCP (`executor mcp --elicitation-mode model`).
+- `packages/tui` (`@caret/tui`) — alternative Cursor CLI frontend on OpenTUI. Separate effort; not wired to `@caret/agent` for now.
 
 ## References Directory
 
@@ -49,13 +46,14 @@ Available references:
 
 - effect-smol — Effect v4
 - opentui — OpenTUI (terminal UI framework)
-- opencode — OpenCode (TUI UI reference; uses OpenTUI in production)
-- cursor-cookbook — Cursor SDK docs and examples (SDK itself is not open source)
-- playwright — Playwright API reference
-- executor — QuickJS engine, tools.\*, pause/elicitation, MCP host (RhysSullivan/executor)
+- opencode — OpenCode (TUI UI reference; uses OpenTUI)
+- cursor-cookbook — Cursor SDK examples (SDK itself is not open source)
+- playwright — Playwright
+- executor — Executor
 - playwriter — Code REPL + VM sandbox for browser automation (reference only)
 - agent-browser — Agent-owned browser daemon, snapshot/ref CLI (vercel-labs)
-- openclaw — OpenClaw code mode (exec/wait + QuickJS-WASI; compare with Cloudflare codemode)
+- openclaw — OpenClaw (reference for caret agent)
+- discord.js — Discord bot library
 
 Cursor SDK is not open source. See `/tmp/references/cursor-cookbook` for SDK docs and examples.
 
