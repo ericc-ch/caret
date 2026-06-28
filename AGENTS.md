@@ -53,6 +53,7 @@ Available references:
 - playwriter — Code REPL + VM sandbox for browser automation (reference only)
 - agent-browser — Agent-owned browser daemon, snapshot/ref CLI (vercel-labs)
 - openclaw — OpenClaw (reference for caret agent)
+- hermes-agent — Hermes Agent (reference for caret agent)
 - discord.js — Discord bot library
 
 Cursor SDK is not open source. See `/tmp/references/cursor-cookbook` for SDK docs and examples.

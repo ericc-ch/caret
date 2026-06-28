@@ -68,6 +68,11 @@ const repositories = [
     directory: "discord.js",
     url: "https://github.com/discordjs/discord.js.git",
   },
+  {
+    name: "Hermes Agent",
+    directory: "hermes-agent",
+    url: "https://github.com/NousResearch/hermes-agent.git",
+  },
 ] satisfies ReadonlyArray<ReferenceRepository>
 
 const referencesDir = "/tmp/references"

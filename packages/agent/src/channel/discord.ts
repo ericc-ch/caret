@@ -1,27 +1,79 @@
 import process from "node:process"
 
-import { Client, GatewayIntentBits, Partials } from "discord.js"
-import { Context, Data, Effect, Layer, Queue, Redacted, Stream } from "effect"
+import { Client, GatewayIntentBits, Partials, type Message } from "discord.js"
+import { Effect, Queue, Redacted, Stream } from "effect"
 
 import { AgentConfig } from "../lib/config.ts"
-import {
-  decodeExecutorPauseFromToolCall,
-  pauseMessage,
-  runFailureMessage,
-} from "../lib/run-helpers.ts"
-import { Sessions } from "../lib/sessions.ts"
+import { ConfigLayer } from "../lib/layers.ts"
 
-import type { ChannelMessage } from "./types.ts"
+import { handleMessage } from "./handle-message.ts"
+import { ChannelHost } from "./host.ts"
+import { DiscordError, type InboundMessage, type InboundPart, type OutboundMessage } from "./types.ts"
 
-class DiscordError extends Data.TaggedError("DiscordError")<{
-  readonly cause: unknown
-}> {}
+const discordThreadId = (channelId: string) => `discord:${channelId}` as const
 
-const discordThreadId = (channelId: string) => `discord:${channelId}`
+const discordInboundParts = (
+  content: string,
+  attachments: Iterable<{ contentType?: string | null; url: string }>,
+) => {
+  const parts: Array<InboundPart> = []
 
-const makeMessages = (token: string) =>
-  Stream.callback<ChannelMessage, DiscordError>(
-    Effect.fn("DiscordChannel.messages")(function* (queue) {
+  if (content.trim()) {
+    parts.push({ type: "text", text: content.trim() })
+  }
+
+  for (const attachment of attachments) {
+    if (attachment.contentType?.startsWith("image/")) {
+      parts.push({ type: "image", source: { kind: "url", url: attachment.url } })
+    }
+  }
+
+  return parts
+}
+
+const outboundText = (outbound: OutboundMessage) =>
+  outbound.parts
+    .flatMap((part) => (part.type === "text" ? [part.text] : []))
+    .join("\n")
+    .trim()
+
+const postToDiscord = Effect.fn("discord.post")(
+  (channel: Message["channel"], outbound: OutboundMessage) => {
+    const body = outboundText(outbound)
+    if (!body || !channel.isSendable()) return Effect.void
+
+    return Effect.tryPromise({
+      try: async () => {
+        await channel.send(body)
+      },
+      catch: (cause) => new DiscordError({ cause }),
+    }).pipe(
+      Effect.catch((error) => Effect.logError("Discord reply failed", error)),
+    )
+  },
+)
+
+const toInbound = (message: Message): InboundMessage | null => {
+  const parts = discordInboundParts(message.content, message.attachments.values())
+  if (parts.length === 0) return null
+
+  const channel = message.channel
+
+  return {
+    threadId: discordThreadId(channel.id),
+    parts,
+    reply: (outbound) => postToDiscord(channel, outbound),
+    meta: {
+      channelId: "discord",
+      authorId: message.author.id,
+      messageId: message.id,
+    },
+  }
+}
+
+const listenDiscord = (token: string) =>
+  Stream.callback<InboundMessage, DiscordError>(
+    Effect.fn("discord.listen")(function* (queue) {
       const client = new Client({
         intents: [
           GatewayIntentBits.Guilds,
@@ -35,22 +87,10 @@ const makeMessages = (token: string) =>
       client.on("messageCreate", (message) => {
         if (message.author.bot) return
 
-        const text = message.content.trim()
-        if (!text) return
+        const inbound = toInbound(message)
+        if (!inbound) return
 
-        const channel = message.channel
-
-        Queue.offerUnsafe(queue, {
-          threadId: discordThreadId(channel.id),
-          text,
-          post: (body) =>
-            Effect.tryPromise({
-              try: async () => {
-                await channel.send(body)
-              },
-              catch: (cause) => new DiscordError({ cause }),
-            }).pipe(Effect.ignore),
-        })
+        Queue.offerUnsafe(queue, inbound)
       })
 
       yield* Effect.acquireRelease(
@@ -71,53 +111,32 @@ const makeMessages = (token: string) =>
     }),
   )
 
-const runDiscordMessage = Effect.fn("runDiscordMessage")(function* (message: ChannelMessage) {
-  const sessions = yield* Sessions
-  const agent = yield* sessions.agent(message.threadId)
-  const run = yield* Effect.promise(() => agent.send(message.text))
-
-  let assistantText = ""
-
-  yield* Stream.fromAsyncIterable(run.stream(), (cause) => new DiscordError({ cause })).pipe(
-    Stream.runForEach((event) =>
+const runInbound = Effect.fn("discord.runInbound")((inbound: InboundMessage) =>
+  handleMessage(inbound, { presentation: "folded" }).pipe(
+    Effect.catch((cause) =>
       Effect.gen(function* () {
-        if (event.type === "assistant") {
-          for (const block of event.message.content) {
-            if (block.type === "text" && block.text) assistantText += block.text
-          }
-        }
-
-        if (event.type === "tool_call") {
-          const pause = decodeExecutorPauseFromToolCall(event)
-          if (pause) yield* message.post(`⏸ ${pauseMessage(pause)}`)
-        }
+        yield* Effect.logError("Discord inbound failed", cause)
+        yield* inbound.reply({ parts: [{ type: "text", text: "Run failed" }] })
       }),
     ),
-  )
+  ),
+)
 
-  const result = yield* Effect.promise(() => run.wait())
-
-  if (assistantText) {
-    yield* message.post(assistantText)
-    return
-  }
-
-  if (result.status === "error") {
-    yield* message.post(runFailureMessage(result))
-  }
-})
-
-export const handleDiscordMessage = (message: ChannelMessage) =>
-  runDiscordMessage(message).pipe(Effect.catch(() => message.post("Run failed")))
-
-export class DiscordChannel extends Context.Service<DiscordChannel>()(
-  "@caret/agent/DiscordChannel",
-  {
-    make: Effect.gen(function* () {
-      const { config } = yield* AgentConfig
-      return { messages: makeMessages(Redacted.value(config.discordToken)) }
-    }),
+const startDiscord = Effect.fn("discord.start")(
+  function* () {
+    const { config } = yield* AgentConfig
+    const token = Redacted.value(config.discordToken)
+    yield* Stream.runForEach(listenDiscord(token), runInbound)
   },
-) {
-  static readonly layer = Layer.effect(this, this.make)
-}
+  Effect.provide(ConfigLayer),
+  Effect.scoped,
+)
+
+ChannelHost.register({
+  id: "discord",
+  capabilities: {
+    inbound: new Set(["text", "image"]),
+    outbound: new Set(["text"]),
+  },
+  start: startDiscord,
+})

@@ -24,6 +24,8 @@ const AgentConfigSchema = Schema.Struct({
   description: "caret-agent configuration at config.json (see paths.config).",
 })
 
+export const agentConfigJsonSchemaDocument = () => Schema.toJsonSchemaDocument(AgentConfigSchema)
+
 const AgentConfigFile = Schema.fromJsonString(AgentConfigSchema)
 
 export class AgentConfig extends Context.Service<AgentConfig>()("@caret/agent/AgentConfig", {

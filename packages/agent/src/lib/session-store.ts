@@ -91,7 +91,9 @@ export class SessionStore extends Context.Service<SessionStore>()("@caret/agent/
         })
       })
 
-    return { get, upsert, touch }
+    const list = () => readStore().pipe(Effect.map((data) => data.threads))
+
+    return { get, upsert, touch, list }
   }),
 }) {
   static readonly layer = Layer.effect(this, this.make)

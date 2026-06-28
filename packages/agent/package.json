@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "bin": {
-    "caret-agent": "./src/cli.ts"
+    "caret-agent": "./src/main.ts"
   },
   "scripts": {
-    "dev": "bun run --watch src/cli.ts",
-    "dev:discord": "bun run --watch src/main.ts",
+    "dev": "bun run --watch src/main.ts chat",
+    "dev:gateway": "bun run --watch src/main.ts gateway run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
