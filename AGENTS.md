@@ -24,8 +24,8 @@ When spawning Task subagents (review, explore, `/simplify`, etc.), use either Co
 
 ## Workspace
 
-- `packages/agent` — multi-channel agent host (`@caret/agent`); **current focus**
-- `packages/tui` — OpenTUI Solid terminal frontend (`@caret/tui`); paused
+- `packages/agent` — multi-channel agent host (`@caret/agent`)
+- `packages/tui` — OpenTUI Solid terminal frontend (`@caret/tui`)
 
 ## Architecture
 
