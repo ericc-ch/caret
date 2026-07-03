@@ -20,10 +20,7 @@ For specific code style and testing guidelines, see [docs/conventions.md](./docs
 
 ## Subagents
 
-When spawning Task subagents (review, explore, `/simplify`, etc.), **always** pass `model: "composer-2.5"`.
-
-- **Do not** use any other model unless the user explicitly overrides in that message.
-- Do not inherit the parent chat model for subagents — use Composer 2.5 even when the parent is a different model.
+When spawning Task subagents (review, explore, `/simplify`, etc.), use either Composer 2.5 / Composer 2.5 Fast depending on the task.
 
 ## Workspace
 
