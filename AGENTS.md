@@ -44,6 +44,7 @@ Available references:
 - effect-smol — Effect v4
 - opentui — OpenTUI (terminal UI framework)
 - opencode — OpenCode (TUI UI reference; uses OpenTUI)
+- t1code — T3Code-style terminal coding agent
 - cursor-cookbook — Cursor SDK examples (SDK itself is not open source)
 - playwright — Playwright
 - executor — Executor

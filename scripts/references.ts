@@ -34,6 +34,11 @@ const repositories = [
     branch: "dev",
   },
   {
+    name: "t1code",
+    directory: "t1code",
+    url: "https://github.com/maria-rcks/t1code.git",
+  },
+  {
     name: "Cursor Cookbook",
     directory: "cursor-cookbook",
     url: "https://github.com/cursor/cookbook.git",
