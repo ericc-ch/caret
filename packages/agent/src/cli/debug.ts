@@ -83,9 +83,7 @@ const debugSessionsCommand = Command.make(
     const sessions = yield* store.list()
     yield* Console.log(Formatter.formatJson(sessions, { space: 2 }))
   }, Effect.provide(SessionStoreLayer)),
-).pipe(
-  Command.withDescription("List persisted agent sessions from sessions.json."),
-)
+).pipe(Command.withDescription("List persisted agent sessions from sessions.json."))
 
 export const debugCommand = Command.make("debug").pipe(
   Command.withShortDescription("Debug and introspection"),

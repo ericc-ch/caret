@@ -1,18 +1,19 @@
 import { Effect } from "effect"
 import { Command, Flag } from "effect/unstable/cli"
 
-import { ChannelHost, parseChannelIds } from "../channel/index.ts"
+import { ChannelHost, parseChannelIds } from "../channel/main.ts"
 import { ensureWorkspace } from "../lib/workspace.ts"
 
 const defaultGatewayChannels = ["discord"] as const
 
-const runGateway = Effect.fn("caret-agent.gateway.run")(
-  function* ({ channels }: { readonly channels: ReadonlyArray<string> }) {
-    yield* ensureWorkspace
-    yield* ChannelHost.start({ only: channels })
-  },
-  Effect.scoped,
-)
+const runGateway = Effect.fn("caret-agent.gateway.run")(function* ({
+  channels,
+}: {
+  readonly channels: ReadonlyArray<string>
+}) {
+  yield* ensureWorkspace
+  yield* ChannelHost.start({ only: channels })
+}, Effect.scoped)
 
 const gatewayRunCommand = Command.make(
   "run",

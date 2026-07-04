@@ -87,7 +87,10 @@ export function createTranscript(renderer: CliRenderer, theme: () => Theme): Tra
     flushActive(true)
     const resolved = theme()
     renderer.writeToScrollback(
-      createScrollbackWriter(() => render(resolved), { startOnNewLine: true, trailingNewline: true }),
+      createScrollbackWriter(() => render(resolved), {
+        startOnNewLine: true,
+        trailingNewline: true,
+      }),
     )
     requestRender()
   }

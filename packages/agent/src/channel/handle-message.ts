@@ -30,10 +30,8 @@ const unsupportedInboundParts = (
   capabilities: ChannelCapabilities,
 ) => parts.filter((part) => !capabilities.inbound.has(part.type))
 
-const filterInboundParts = (
-  parts: ReadonlyArray<InboundPart>,
-  capabilities: ChannelCapabilities,
-) => parts.filter((part) => capabilities.inbound.has(part.type))
+const filterInboundParts = (parts: ReadonlyArray<InboundPart>, capabilities: ChannelCapabilities) =>
+  parts.filter((part) => capabilities.inbound.has(part.type))
 
 const resolveImage = Effect.fn("resolveImage")((source: ImageSource) =>
   Match.value(source).pipe(

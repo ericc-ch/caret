@@ -8,7 +8,12 @@ import { ConfigLayer } from "../lib/layers.ts"
 
 import { handleMessage } from "./handle-message.ts"
 import { ChannelHost } from "./host.ts"
-import { DiscordError, type InboundMessage, type InboundPart, type OutboundMessage } from "./types.ts"
+import {
+  DiscordError,
+  type InboundMessage,
+  type InboundPart,
+  type OutboundMessage,
+} from "./types.ts"
 
 const discordThreadId = (channelId: string) => `discord:${channelId}` as const
 
@@ -37,21 +42,20 @@ const outboundText = (outbound: OutboundMessage) =>
     .join("\n")
     .trim()
 
-const postToDiscord = Effect.fn("discord.post")(
-  (channel: Message["channel"], outbound: OutboundMessage) => {
-    const body = outboundText(outbound)
-    if (!body || !channel.isSendable()) return Effect.void
+const postToDiscord = Effect.fn("discord.post")((
+  channel: Message["channel"],
+  outbound: OutboundMessage,
+) => {
+  const body = outboundText(outbound)
+  if (!body || !channel.isSendable()) return Effect.void
 
-    return Effect.tryPromise({
-      try: async () => {
-        await channel.send(body)
-      },
-      catch: (cause) => new DiscordError({ cause }),
-    }).pipe(
-      Effect.catch((error) => Effect.logError("Discord reply failed", error)),
-    )
-  },
-)
+  return Effect.tryPromise({
+    try: async () => {
+      await channel.send(body)
+    },
+    catch: (cause) => new DiscordError({ cause }),
+  }).pipe(Effect.catch((error) => Effect.logError("Discord reply failed", error)))
+})
 
 const toInbound = (message: Message): InboundMessage | null => {
   const parts = discordInboundParts(message.content, message.attachments.values())

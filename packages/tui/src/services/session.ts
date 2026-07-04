@@ -7,7 +7,10 @@ import type { Transcript } from "../scrollback/transcript.tsx"
 
 export type AgentId = string
 
-export class AgentNotActive extends Schema.TaggedErrorClass<AgentNotActive>()("AgentNotActive", {}) {}
+export class AgentNotActive extends Schema.TaggedErrorClass<AgentNotActive>()(
+  "AgentNotActive",
+  {},
+) {}
 
 export class AgentStartError extends Schema.TaggedErrorClass<AgentStartError>()("AgentStartError", {
   cause: Schema.Defect(),

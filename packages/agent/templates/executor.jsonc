@@ -1,5 +1,5 @@
 {
   // Executor tool sources and plugins for this workspace.
   // Configure interactively: executor web
-  "plugins": []
+  "plugins": [],
 }

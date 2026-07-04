@@ -2,10 +2,10 @@
   "name": "@caret/agent",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
   "bin": {
     "caret-agent": "./src/main.ts"
   },
+  "type": "module",
   "scripts": {
     "dev": "bun run --watch src/main.ts chat",
     "dev:gateway": "bun run --watch src/main.ts gateway run",
