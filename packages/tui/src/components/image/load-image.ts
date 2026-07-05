@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url"
 
-import { Jimp } from "jimp"
+import sharp from "sharp"
 
 import {
   DecodedImage,
@@ -10,15 +10,16 @@ import {
   type ImageSource,
 } from "./types.ts"
 
-function toImageFormat(mime: string): ImageFormat {
-  switch (mime) {
-    case "image/png":
+function toImageFormat(format: string): ImageFormat {
+  switch (format) {
+    case "png":
       return "png"
-    case "image/jpeg":
+    case "jpeg":
+    case "jpg":
       return "jpeg"
-    case "image/webp":
+    case "webp":
       return "webp"
-    case "image/gif":
+    case "gif":
       return "gif"
     default:
       return "unknown"
@@ -32,35 +33,41 @@ function imageHasAlpha(data: Uint8Array): boolean {
   return false
 }
 
-interface JimpBitmap {
-  bitmap: { data: Buffer; width: number; height: number }
-  mime?: string
-}
-
-function fromJimp(image: JimpBitmap): DecodedImage {
-  const { data, width, height } = image.bitmap
-  const rgba = new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
-  return new DecodedImage({
-    data: rgba,
-    width,
-    height,
-    format: toImageFormat(image.mime ?? ""),
-    hasAlpha: imageHasAlpha(rgba),
-  })
-}
-
 function encodedBytes(data: Uint8Array | ArrayBuffer): Uint8Array {
   if (data instanceof Uint8Array) return data
   if (data instanceof ArrayBuffer) return new Uint8Array(data)
   throw new TypeError("image data must be a Uint8Array or ArrayBuffer")
 }
 
-async function readJimp(input: string | Uint8Array | ArrayBuffer): Promise<DecodedImage> {
-  const image =
+function decodeDataUrl(source: string): Uint8Array | null {
+  const comma = source.indexOf(",")
+  if (comma === -1 || !source.startsWith("data:")) return null
+  const meta = source.slice(5, comma)
+  if (!meta.includes(";base64")) return null
+  return new Uint8Array(Buffer.from(source.slice(comma + 1), "base64"))
+}
+
+async function readSharp(input: string | Uint8Array | ArrayBuffer): Promise<DecodedImage> {
+  const sharpInput =
     typeof input === "string"
-      ? await Jimp.read(input)
-      : await Jimp.fromBuffer(Buffer.from(encodedBytes(input)))
-  return fromJimp(image)
+      ? input
+      : (() => {
+          const bytes = encodedBytes(input)
+          return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+        })()
+
+  const image = sharp(sharpInput)
+  const metadata = await image.metadata()
+  const { data, info } = await image.clone().ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  const rgba = new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+
+  return new DecodedImage({
+    data: rgba,
+    width: info.width,
+    height: info.height,
+    format: toImageFormat(metadata.format ?? ""),
+    hasAlpha: metadata.hasAlpha ?? imageHasAlpha(rgba),
+  })
 }
 
 export async function loadDecodedImage(
@@ -70,13 +77,13 @@ export async function loadDecodedImage(
   options.signal?.throwIfAborted()
 
   if (source instanceof Uint8Array || source instanceof ArrayBuffer) {
-    return readJimp(source)
+    return readSharp(source)
   }
 
   if (source instanceof URL) {
     if (source.protocol === "file:") {
       try {
-        return await readJimp(fileURLToPath(source))
+        return await readSharp(fileURLToPath(source))
       } catch (error) {
         if (options.signal?.aborted) throw options.signal.reason
         throw new ImageLoadError({
@@ -113,7 +120,7 @@ export async function loadDecodedImage(
       }
 
       options.signal?.throwIfAborted()
-      return readJimp(new Uint8Array(await response.arrayBuffer()))
+      return readSharp(new Uint8Array(await response.arrayBuffer()))
     }
 
     throw new ImageLoadError({
@@ -123,9 +130,51 @@ export async function loadDecodedImage(
     })
   }
 
-  if (/^https?:\/\//i.test(source) || /^data:/i.test(source)) {
+  if (/^data:/i.test(source)) {
     try {
-      return await readJimp(source)
+      const bytes = decodeDataUrl(source)
+      if (!bytes) {
+        throw new Error("Invalid data URL")
+      }
+      return await readSharp(bytes)
+    } catch (error) {
+      if (options.signal?.aborted) throw options.signal.reason
+      throw new ImageLoadError({
+        code: "decode",
+        source,
+        message: `Failed to load image: ${source.slice(0, 48)}`,
+        cause: error,
+      })
+    }
+  }
+
+  if (/^https?:\/\//i.test(source)) {
+    const fetchImpl = options.fetch ?? fetch
+    let response: Response
+    try {
+      response = await fetchImpl(new URL(source), options.signal ? { signal: options.signal } : {})
+    } catch (error) {
+      if (options.signal?.aborted) throw options.signal.reason
+      throw new ImageLoadError({
+        code: "network",
+        source,
+        message: `Failed to fetch image: ${source}`,
+        cause: error,
+      })
+    }
+
+    if (!response.ok) {
+      throw new ImageLoadError({
+        code: "http-status",
+        source,
+        message: `HTTP ${response.status} for ${source}`,
+        status: response.status,
+      })
+    }
+
+    options.signal?.throwIfAborted()
+    try {
+      return await readSharp(new Uint8Array(await response.arrayBuffer()))
     } catch (error) {
       if (options.signal?.aborted) throw options.signal.reason
       throw new ImageLoadError({
@@ -138,7 +187,7 @@ export async function loadDecodedImage(
   }
 
   try {
-    return await readJimp(source)
+    return await readSharp(source)
   } catch (error) {
     if (options.signal?.aborted) throw options.signal.reason
     const code =

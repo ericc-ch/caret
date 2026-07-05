@@ -13,7 +13,7 @@
     "@opentui/core": "catalog:opentui",
     "@opentui/solid": "catalog:opentui",
     "effect": "catalog:effect",
-    "jimp": "^1.6.1",
+    "sharp": "^0.34.3",
     "opentui-spinner": "catalog:opentui",
     "solid-js": "catalog:opentui"
   },

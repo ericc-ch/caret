@@ -1,11 +1,12 @@
 import process from "node:process"
-import { Agent, type SDKAgent } from "@cursor/sdk"
+import { Agent, type SDKAgent, type SDKAgentInfo } from "@cursor/sdk"
 import { Context, Effect, Layer, Ref, Schema } from "effect"
 import { formatError } from "../lib/format-error.ts"
-import { Commit } from "../scrollback/stream-commit.ts"
-import type { Transcript } from "../scrollback/transcript.tsx"
+import { Commit, type TranscriptSink } from "../app/transcript/types.ts"
 
 export type AgentId = string
+
+export type { SDKAgentInfo }
 
 export class AgentNotActive extends Schema.TaggedErrorClass<AgentNotActive>()(
   "AgentNotActive",
@@ -16,6 +17,18 @@ export class AgentStartError extends Schema.TaggedErrorClass<AgentStartError>()(
   cause: Schema.Defect(),
 }) {}
 
+export class SessionListError extends Schema.TaggedErrorClass<SessionListError>()("SessionListError", {
+  cause: Schema.Defect(),
+}) {}
+
+export class SessionResumeError extends Schema.TaggedErrorClass<SessionResumeError>()(
+  "SessionResumeError",
+  {
+    agentId: Schema.String,
+    cause: Schema.Defect(),
+  },
+) {}
+
 export class PromptError extends Schema.TaggedErrorClass<PromptError>()("PromptError", {
   agentId: Schema.String,
   runId: Schema.optional(Schema.String),
@@ -24,26 +37,41 @@ export class PromptError extends Schema.TaggedErrorClass<PromptError>()("PromptE
 
 type PromptInput = {
   readonly text: string
-  readonly sink: Transcript
+  readonly sink: TranscriptSink
 }
 
 export type SessionInterface = {
-  readonly create: () => Effect.Effect<AgentId, AgentStartError>
+  readonly list: () => Effect.Effect<ReadonlyArray<SDKAgentInfo>, SessionListError>
+  readonly create: (name?: string) => Effect.Effect<AgentId, AgentStartError>
+  readonly resume: (agentId: AgentId) => Effect.Effect<AgentId, SessionResumeError>
+  readonly activeAgentId: () => Effect.Effect<AgentId | undefined>
   readonly prompt: (input: PromptInput) => Effect.Effect<void, AgentNotActive | PromptError>
 }
 
-function agentOptions() {
+function localSdkBase() {
+  return { cwd: process.cwd() } as const
+}
+
+function createOptions(name?: string) {
   const apiKey = process.env["CURSOR_API_KEY"]
   return {
     ...(apiKey ? { apiKey } : {}),
+    ...(name ? { name } : {}),
     model: { id: "composer-2.5" as const },
-    local: { cwd: process.cwd() },
+    local: localSdkBase(),
   }
+}
+
+function disposeAgent(current: SDKAgent) {
+  return Effect.tryPromise({
+    try: () => current[Symbol.asyncDispose](),
+    catch: (cause) => new AgentStartError({ cause }),
+  }).pipe(Effect.ignore)
 }
 
 function failPrompt(input: {
   agentId: string
-  sink: Transcript
+  sink: TranscriptSink
   runId?: string
   cause?: unknown
   detail?: string
@@ -57,21 +85,52 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
   make: Effect.gen(function* () {
     const agent = yield* Ref.make<SDKAgent | undefined>(undefined)
 
-    const create = Effect.fn("Session.create")(function* () {
+    const list = Effect.fn("Session.list")(function* () {
+      const result = yield* Effect.tryPromise({
+        try: () =>
+          Agent.list({
+            runtime: "local",
+            cwd: process.cwd(),
+            limit: 50,
+          }),
+        catch: (cause) => new SessionListError({ cause }),
+      })
+      return result.items
+    })
+
+    const create = Effect.fn("Session.create")(function* (name?: string) {
       const next = yield* Effect.tryPromise({
-        try: () => Agent.create(agentOptions()),
+        try: () => Agent.create(createOptions(name ?? "General chat")),
         catch: (cause) => new AgentStartError({ cause }),
       })
 
       const previous = yield* Ref.get(agent)
       if (previous) {
-        yield* Effect.sync(() => {
-          void previous.close()
-        })
+        yield* disposeAgent(previous)
       }
 
       yield* Ref.set(agent, next)
       return next.agentId
+    })
+
+    const resume = Effect.fn("Session.resume")(function* (agentId: AgentId) {
+      const previous = yield* Ref.get(agent)
+      if (previous) {
+        yield* disposeAgent(previous)
+      }
+
+      const next = yield* Effect.tryPromise({
+        try: () => Agent.resume(agentId, createOptions()),
+        catch: (cause) => new SessionResumeError({ agentId, cause }),
+      })
+
+      yield* Ref.set(agent, next)
+      return next.agentId
+    })
+
+    const activeAgentId = Effect.fn("Session.activeAgentId")(function* () {
+      const current = yield* Ref.get(agent)
+      return current?.agentId
     })
 
     const prompt = Effect.fn("Session.prompt")(function* (input: PromptInput) {
@@ -150,11 +209,11 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       Effect.gen(function* () {
         const current = yield* Ref.get(agent)
         if (!current) return
-        yield* Effect.sync(() => void current.close())
+        yield* disposeAgent(current)
       }),
     )
 
-    return { create, prompt }
+    return { list, create, resume, activeAgentId, prompt }
   }),
 }) {
   static readonly layer = Layer.effect(this, this.make)

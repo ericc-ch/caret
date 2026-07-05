@@ -1,12 +1,24 @@
+import { createCliRenderer } from "@opentui/core"
 import { render } from "@opentui/solid"
 import { RegistryProvider } from "@effect/atom-solid"
-import { App } from "./app.tsx"
+import { App } from "./app/app.tsx"
 import { registerImage } from "./components/register.ts"
 import { ThemeProvider } from "./lib/theme.tsx"
 
 registerImage()
 
-render(
+const renderer = await createCliRenderer({
+  screenMode: "alternate-screen",
+  externalOutputMode: "passthrough",
+  targetFps: 60,
+  exitOnCtrlC: false,
+  useKittyKeyboard: {},
+  autoFocus: false,
+  openConsoleOnError: false,
+  useMouse: true,
+})
+
+await render(
   () => (
     <RegistryProvider>
       <ThemeProvider>
@@ -14,8 +26,5 @@ render(
       </ThemeProvider>
     </RegistryProvider>
   ),
-  {
-    screenMode: "split-footer",
-    footerHeight: 3,
-  },
+  renderer,
 )
