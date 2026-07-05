@@ -31,38 +31,25 @@ function ContextTabs() {
   )
 }
 
-function ChangesTab(props: { files: () => ReadonlyArray<GitFileChange> }) {
+function FileListTab(props: {
+  files: () => ReadonlyArray<GitFileChange>
+  mode: ContextTab
+}) {
   const { theme } = useTheme()
+  const empty = props.mode === "changes" ? "No changes" : "No modified files"
 
   return (
     <box flexDirection="column" gap={0} flexGrow={1} minHeight={0}>
       {props.files().length === 0 ? (
-        <text fg={theme().textMuted}>No changes</text>
+        <text fg={theme().textMuted}>{empty}</text>
       ) : (
         <For each={props.files()}>
           {(file) => (
-            <text fg={theme().text} wrapMode="word">
-              {file.status.padEnd(2)} {file.path}
-            </text>
-          )}
-        </For>
-      )}
-    </box>
-  )
-}
-
-function FilesTab(props: { files: () => ReadonlyArray<GitFileChange> }) {
-  const { theme } = useTheme()
-
-  return (
-    <box flexDirection="column" gap={0} flexGrow={1} minHeight={0}>
-      {props.files().length === 0 ? (
-        <text fg={theme().textMuted}>No modified files</text>
-      ) : (
-        <For each={props.files()}>
-          {(file) => (
-            <text fg={theme().textMuted} wrapMode="word">
-              {file.path}
+            <text
+              fg={props.mode === "changes" ? theme().text : theme().textMuted}
+              wrapMode="word"
+            >
+              {props.mode === "changes" ? `${file.status.padEnd(2)} ${file.path}` : file.path}
             </text>
           )}
         </For>
@@ -76,15 +63,22 @@ export function ContextRail() {
   const layout = useLayout()
   const [files, setFiles] = createSignal<ReadonlyArray<GitFileChange>>([])
   const [isRepo, setIsRepo] = createSignal(true)
+  let refreshing = false
 
   const refresh = async () => {
-    const repo = await isGitRepository()
-    setIsRepo(repo)
-    if (!repo) {
-      setFiles([])
-      return
+    if (refreshing) return
+    refreshing = true
+    try {
+      const repo = isRepo() || (await isGitRepository())
+      setIsRepo(repo)
+      if (!repo) {
+        setFiles([])
+        return
+      }
+      setFiles(await readGitStatus())
+    } finally {
+      refreshing = false
     }
-    setFiles(await readGitStatus())
   }
 
   onMount(() => {
@@ -119,10 +113,10 @@ export function ContextRail() {
       ) : (
         <Switch>
           <Match when={layout.contextTab() === "changes"}>
-            <ChangesTab files={files} />
+            <FileListTab files={files} mode="changes" />
           </Match>
           <Match when={layout.contextTab() === "files"}>
-            <FilesTab files={files} />
+            <FileListTab files={files} mode="files" />
           </Match>
         </Switch>
       )}

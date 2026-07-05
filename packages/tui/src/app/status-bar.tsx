@@ -12,12 +12,6 @@ export function StatusBar(props: { status: PromptStatus }) {
     void readGitBranch().then(setBranch)
   })
 
-  const left = () => {
-    const gitBranch = branch()
-    const cwd = displayCwd()
-    return gitBranch ? `${gitBranch} · ${cwd}` : cwd
-  }
-
   return (
     <box
       flexDirection="row"
@@ -28,7 +22,9 @@ export function StatusBar(props: { status: PromptStatus }) {
       paddingTop={1}
       paddingBottom={1}
     >
-      <text fg={theme().textMuted}>{left()}</text>
+      <text fg={theme().textMuted}>
+        {branch() ? `${branch()} · ${displayCwd()}` : displayCwd()}
+      </text>
       <text fg={theme().textMuted}>{props.status}</text>
     </box>
   )

@@ -1,7 +1,7 @@
 import { createMemo, createSignal, type Accessor } from "solid-js"
 import { useTerminalDimensions } from "@opentui/solid"
 import { createSimpleContext } from "./helper.ts"
-import { isWide } from "../lib/layout.ts"
+import { WIDE_BREAKPOINT } from "../lib/layout.ts"
 
 export type ContextTab = "changes" | "files"
 
@@ -19,7 +19,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
   name: "Layout",
   init: (): LayoutContextValue => {
     const dimensions = useTerminalDimensions()
-    const wide = createMemo(() => isWide(dimensions().width))
+    const wide = createMemo(() => dimensions().width >= WIDE_BREAKPOINT)
 
     const [navOpen, setNavOpen] = createSignal(true)
     const [contextOpen, setContextOpen] = createSignal(true)

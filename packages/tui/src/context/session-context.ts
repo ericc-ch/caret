@@ -1,14 +1,13 @@
-import { createSignal, onMount, type Accessor } from "solid-js"
 import { Effect } from "effect"
-import { createSimpleContext } from "./helper.ts"
+import { createSignal, onMount, type Accessor } from "solid-js"
 import { formatError } from "../lib/format-error.ts"
 import { runtime } from "../lib/runtime.ts"
-import {
-  Session,
-  type AgentId,
-  type SDKAgentInfo,
-  type SessionInterface,
-} from "../services/session.ts"
+import { Session, type AgentId, type SDKAgentInfo, type SessionInterface } from "../services/session.ts"
+import { createSimpleContext } from "./helper.ts"
+
+function runSession<A, E>(fn: (session: SessionInterface) => Effect.Effect<A, E, Session>) {
+  return runtime.runPromise(Session.use(fn))
+}
 
 export type SessionContextValue = {
   readonly sessions: Accessor<ReadonlyArray<SDKAgentInfo>>
@@ -18,12 +17,6 @@ export type SessionContextValue = {
   readonly refresh: () => Promise<void>
   readonly create: (name?: string) => Promise<AgentId>
   readonly resume: (agentId: AgentId) => Promise<AgentId>
-}
-
-function runSession<A, E>(fn: (session: SessionInterface) => Effect.Effect<A, E, Session>) {
-  return runtime.runPromise(
-    Effect.flatMap(runtime.contextEffect, (context) => Effect.provide(Session.use(fn), context)),
-  )
 }
 
 export const { use: useSession, provider: SessionProvider } = createSimpleContext({
@@ -61,8 +54,10 @@ export const { use: useSession, provider: SessionProvider } = createSimpleContex
           setSessions(items)
 
           if (items.length > 0) {
-            const first = items[0]!
-            const id = await runSession((session) => session.resume(first.agentId))
+            const latest = [...items].sort(
+              (a, b) => (b.lastModified ?? 0) - (a.lastModified ?? 0),
+            )[0]!
+            const id = await runSession((session) => session.resume(latest.agentId))
             setActiveAgentId(id)
           } else {
             await create()

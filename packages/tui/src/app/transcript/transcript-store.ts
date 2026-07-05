@@ -4,11 +4,6 @@ import { type StreamCommit, type TranscriptEntry, type TranscriptSink } from "./
 
 let nextId = 0
 
-function entryId(): string {
-  nextId += 1
-  return `entry-${nextId}`
-}
-
 export function createTranscriptStore(): TranscriptSink & { entries: () => ReadonlyArray<TranscriptEntry> } {
   const [entries, setEntries] = createSignal<ReadonlyArray<TranscriptEntry>>([])
 
@@ -18,16 +13,19 @@ export function createTranscriptStore(): TranscriptSink & { entries: () => Reado
       if (last?.kind === kind && last.streaming) {
         return [...current.slice(0, -1), { ...last, text, streaming }]
       }
-      return [...current, { id: entryId(), kind, text, streaming }]
+      nextId += 1
+      return [...current, { id: `entry-${nextId}`, kind, text, streaming }]
     })
   }
 
   const commit = Match.typeTags<StreamCommit>()({
     User: ({ text }) => {
-      setEntries((current) => [...current, { id: entryId(), kind: "user", text }])
+      nextId += 1
+      setEntries((current) => [...current, { id: `entry-${nextId}`, kind: "user", text }])
     },
     Error: ({ text }) => {
-      setEntries((current) => [...current, { id: entryId(), kind: "error", text }])
+      nextId += 1
+      setEntries((current) => [...current, { id: `entry-${nextId}`, kind: "error", text }])
     },
     Thinking: ({ text, done }) => {
       const content = text ? `Thinking: ${text}` : "Thinking:"
@@ -57,4 +55,3 @@ export function createTranscriptStore(): TranscriptSink & { entries: () => Reado
     },
   }
 }
-

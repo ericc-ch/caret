@@ -2,14 +2,9 @@ import { TextAttributes } from "@opentui/core"
 import { For } from "solid-js"
 import { useTheme } from "../lib/theme.tsx"
 import { displayCwd, NAV_WIDTH } from "../lib/layout.ts"
+import { sessionDisplayTitle } from "../lib/session-display.ts"
 import { useSession } from "../context/session-context.ts"
 import { SplitBorder } from "../ui/border.ts"
-
-function sessionLabel(name: string, summary: string, agentId: string): string {
-  if (name.trim()) return name
-  if (summary.trim()) return summary
-  return agentId.slice(0, 8)
-}
 
 export function NavPanel() {
   const { theme } = useTheme()
@@ -61,7 +56,7 @@ export function NavPanel() {
               >
                 <text fg={selected() ? theme().accent : theme().text}>
                   {selected() ? "▸ " : "  "}
-                  {sessionLabel(item.name, item.summary, item.agentId)}
+                  {sessionDisplayTitle(item)}
                 </text>
               </box>
             )

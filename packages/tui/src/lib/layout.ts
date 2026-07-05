@@ -4,11 +4,7 @@ export const NAV_WIDTH = 28
 export const CONTEXT_WIDTH = 24
 export const WIDE_BREAKPOINT = 120
 
-export function isWide(width: number): boolean {
-  return width >= WIDE_BREAKPOINT
-}
-
-export function truncatePath(path: string, maxLength = 32): string {
+export function truncatePath(path: string, maxLength = 32) {
   if (path.length <= maxLength) return path
   const home = process.env["HOME"]
   if (home && path.startsWith(home)) {
@@ -19,6 +15,6 @@ export function truncatePath(path: string, maxLength = 32): string {
   return `…${path.slice(-(maxLength - 1))}`
 }
 
-export function displayCwd(): string {
+export function displayCwd() {
   return truncatePath(process.cwd())
 }
