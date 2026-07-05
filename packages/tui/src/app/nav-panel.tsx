@@ -4,8 +4,6 @@ import { useTheme } from "../lib/theme.tsx"
 import { displayCwd, NAV_WIDTH } from "../lib/layout.ts"
 import { sessionDisplayTitle } from "../lib/session-display.ts"
 import { useSession } from "../context/session-context.ts"
-import { SplitBorder } from "../ui/border.ts"
-
 export function NavPanel() {
   const { theme } = useTheme()
   const session = useSession()
@@ -16,9 +14,6 @@ export function NavPanel() {
       height="100%"
       flexDirection="column"
       backgroundColor={theme().backgroundPanel}
-      border={["right"]}
-      customBorderChars={SplitBorder.customBorderChars}
-      borderColor={theme().border}
       paddingLeft={1}
       paddingRight={1}
       paddingTop={1}

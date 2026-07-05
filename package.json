@@ -40,7 +40,9 @@
   },
   "devDependencies": {
     "@effect/language-service": "^0.86.2",
+    "@effect/platform-node": "catalog:effect",
     "@types/node": "catalog:",
+    "effect": "catalog:effect",
     "oxfmt": "^0.54.0",
     "oxlint": "^1.69.0",
     "simple-git-hooks": "^2.13.1",

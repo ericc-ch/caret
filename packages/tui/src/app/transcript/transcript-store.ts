@@ -1,56 +1,56 @@
-import { Match } from "effect"
 import { createSignal } from "solid-js"
-import { type StreamCommit, type TranscriptEntry, type TranscriptSink } from "./types.ts"
+import {
+  applyCommit,
+  type StreamCommit,
+  type TranscriptEntry,
+  type TranscriptSink,
+} from "../../lib/transcript.ts"
 
-let nextId = 0
-
-export function createTranscriptStore(): TranscriptSink & { entries: () => ReadonlyArray<TranscriptEntry> } {
+export function createTranscriptStore(): TranscriptSink & {
+  entries: () => ReadonlyArray<TranscriptEntry>
+  hasCache: (agentId: string) => boolean
+  switchAgent: (agentId: string | undefined) => void
+  hydrate: (agentId: string, next: ReadonlyArray<TranscriptEntry>) => void
+} {
+  const cache = new Map<string, ReadonlyArray<TranscriptEntry>>()
+  let activeAgentId: string | undefined
   const [entries, setEntries] = createSignal<ReadonlyArray<TranscriptEntry>>([])
 
-  const upsertStreaming = (kind: "thinking" | "assistant", text: string, streaming: boolean) => {
-    setEntries((current) => {
-      const last = current.at(-1)
-      if (last?.kind === kind && last.streaming) {
-        return [...current.slice(0, -1), { ...last, text, streaming }]
-      }
-      nextId += 1
-      return [...current, { id: `entry-${nextId}`, kind, text, streaming }]
-    })
+  const persist = (next: ReadonlyArray<TranscriptEntry>) => {
+    setEntries(next)
+    if (activeAgentId) {
+      cache.set(activeAgentId, next)
+    }
   }
 
-  const commit = Match.typeTags<StreamCommit>()({
-    User: ({ text }) => {
-      nextId += 1
-      setEntries((current) => [...current, { id: `entry-${nextId}`, kind: "user", text }])
-    },
-    Error: ({ text }) => {
-      nextId += 1
-      setEntries((current) => [...current, { id: `entry-${nextId}`, kind: "error", text }])
-    },
-    Thinking: ({ text, done }) => {
-      const content = text ? `Thinking: ${text}` : "Thinking:"
-      upsertStreaming("thinking", content, !done)
-    },
-    Assistant: ({ text, done }) => {
-      const content = text.trim() || (done ? "" : " ")
-      if (!content && done) {
-        setEntries((current) => {
-          const last = current.at(-1)
-          if (last?.kind === "assistant" && last.streaming) {
-            return current.slice(0, -1)
-          }
-          return current
-        })
-        return
-      }
-      upsertStreaming("assistant", content, !done)
-    },
-  })
+  const switchAgent = (agentId: string | undefined) => {
+    if (activeAgentId) {
+      cache.set(activeAgentId, entries())
+    }
+    activeAgentId = agentId
+    setEntries(agentId ? (cache.get(agentId) ?? []) : [])
+  }
+
+  const hasCache = (agentId: string) => cache.has(agentId)
+
+  const hydrate = (agentId: string, next: ReadonlyArray<TranscriptEntry>) => {
+    cache.set(agentId, next)
+    if (activeAgentId === agentId) {
+      setEntries(next)
+    }
+  }
+
+  const commit = (c: StreamCommit) => persist(applyCommit(entries(), c))
 
   return {
     entries,
+    hasCache,
+    switchAgent,
+    hydrate,
     commit,
     dispose() {
+      cache.clear()
+      activeAgentId = undefined
       setEntries([])
     },
   }

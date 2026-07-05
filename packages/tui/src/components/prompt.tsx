@@ -23,18 +23,18 @@ export function Prompt(props: { status: PromptStatus; onSubmit: (text: string) =
   let textarea: TextareaRenderable | undefined
 
   const disabled = () => props.status !== "ready"
-  const background = () => theme().background
+  const background = () => theme().backgroundElement
 
   const placeholderText = () => {
     switch (props.status) {
       case "connecting":
         return "Connecting…"
       case "running":
-        return "…"
+        return "Waiting for response…"
       case "unavailable":
         return "Unavailable"
       default:
-        return ""
+        return "Ask anything…"
     }
   }
 
@@ -73,10 +73,17 @@ export function Prompt(props: { status: PromptStatus; onSubmit: (text: string) =
   })
 
   return (
-    <box width="100%" flexDirection="row" paddingLeft={1} paddingRight={1}>
-      <text flexShrink={0} fg={disabled() ? theme().textMuted : theme().accent}>
-        ›{" "}
-      </text>
+    <box
+      width="100%"
+      flexDirection="column"
+      backgroundColor={background()}
+      paddingLeft={1}
+      paddingRight={1}
+      paddingTop={1}
+      paddingBottom={1}
+      gap={0}
+    >
+      <text fg={theme().textMuted}>Message</text>
       <textarea
         ref={(value) => {
           textarea = value

@@ -3,8 +3,6 @@ import { useTheme } from "../../lib/theme.tsx"
 import { CONTEXT_WIDTH } from "../../lib/layout.ts"
 import { useLayout, type ContextTab } from "../../context/layout.ts"
 import { isGitRepository, readGitStatus, type GitFileChange } from "../../lib/git.ts"
-import { SplitBorder } from "../../ui/border.ts"
-
 function ContextTabs() {
   const { theme } = useTheme()
   const layout = useLayout()
@@ -97,9 +95,6 @@ export function ContextRail() {
       height="100%"
       flexDirection="column"
       backgroundColor={theme().backgroundPanel}
-      border={["left"]}
-      customBorderChars={SplitBorder.customBorderChars}
-      borderColor={theme().border}
       paddingLeft={1}
       paddingRight={1}
       paddingTop={1}

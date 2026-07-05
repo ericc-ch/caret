@@ -11,7 +11,7 @@ const renderer = await createCliRenderer({
   screenMode: "alternate-screen",
   externalOutputMode: "passthrough",
   targetFps: 60,
-  exitOnCtrlC: false,
+  exitOnCtrlC: true,
   useKittyKeyboard: {},
   autoFocus: false,
   openConsoleOnError: false,

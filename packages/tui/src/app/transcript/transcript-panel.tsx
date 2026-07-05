@@ -1,6 +1,6 @@
 import { For, createMemo } from "solid-js"
 import { useTerminalDimensions } from "@opentui/solid"
-import type { TranscriptEntry } from "./types.ts"
+import type { TranscriptEntry } from "../../lib/transcript.ts"
 import { TranscriptEntryView } from "./transcript-entry.tsx"
 
 export function TranscriptPanel(props: { entries: () => ReadonlyArray<TranscriptEntry> }) {

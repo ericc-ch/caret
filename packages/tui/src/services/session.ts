@@ -1,8 +1,17 @@
 import process from "node:process"
 import { Agent, type SDKAgent, type SDKAgentInfo } from "@cursor/sdk"
 import { Context, Effect, Layer, Ref, Schema } from "effect"
+import {
+  Commit,
+  entriesFromSdkMessages,
+  type TranscriptEntry,
+  type TranscriptSink,
+} from "../lib/transcript.ts"
 import { formatError } from "../lib/format-error.ts"
-import { Commit, type TranscriptSink } from "../app/transcript/types.ts"
+import {
+  resolveDefaultSdkCwd,
+  resolveSdkListCwds,
+} from "../lib/workspace.ts"
 
 export type AgentId = string
 
@@ -43,22 +52,22 @@ type PromptInput = {
 export type SessionInterface = {
   readonly list: () => Effect.Effect<ReadonlyArray<SDKAgentInfo>, SessionListError>
   readonly create: (name?: string) => Effect.Effect<AgentId, AgentStartError>
-  readonly resume: (agentId: AgentId) => Effect.Effect<AgentId, SessionResumeError>
+  readonly resume: (agentId: AgentId, cwd?: string) => Effect.Effect<AgentId, SessionResumeError>
+  readonly loadTranscript: (
+    agentId: AgentId,
+    cwd?: string,
+  ) => Effect.Effect<ReadonlyArray<TranscriptEntry>, SessionListError>
   readonly activeAgentId: () => Effect.Effect<AgentId | undefined>
   readonly prompt: (input: PromptInput) => Effect.Effect<void, AgentNotActive | PromptError>
 }
 
-function localSdkBase() {
-  return { cwd: process.cwd() } as const
-}
-
-function createOptions(name?: string) {
+function createOptions(cwd: string, name?: string) {
   const apiKey = process.env["CURSOR_API_KEY"]
   return {
     ...(apiKey ? { apiKey } : {}),
     ...(name ? { name } : {}),
     model: { id: "composer-2.5" as const },
-    local: localSdkBase(),
+    local: { cwd },
   }
 }
 
@@ -81,26 +90,53 @@ function failPrompt(input: {
   return new PromptError({ agentId: input.agentId, runId: input.runId, detail })
 }
 
+function mergeListedAgents(lists: ReadonlyArray<ReadonlyArray<SDKAgentInfo>>) {
+  const merged = new Map<string, SDKAgentInfo>()
+  for (const items of lists) {
+    for (const item of items) {
+      const existing = merged.get(item.agentId)
+      if (!existing || (item.lastModified ?? 0) >= (existing.lastModified ?? 0)) {
+        merged.set(item.agentId, item)
+      }
+    }
+  }
+  return [...merged.values()].sort((a, b) => (b.lastModified ?? 0) - (a.lastModified ?? 0))
+}
+
 export class Session extends Context.Service<Session, SessionInterface>()("@caret/Session", {
   make: Effect.gen(function* () {
     const agent = yield* Ref.make<SDKAgent | undefined>(undefined)
+    const agentCwd = yield* Ref.make<string | undefined>(undefined)
 
     const list = Effect.fn("Session.list")(function* () {
-      const result = yield* Effect.tryPromise({
-        try: () =>
-          Agent.list({
-            runtime: "local",
-            cwd: process.cwd(),
-            limit: 50,
-          }),
+      const cwds = yield* Effect.tryPromise({
+        try: () => resolveSdkListCwds(),
         catch: (cause) => new SessionListError({ cause }),
       })
-      return result.items
+
+      const lists = yield* Effect.forEach(cwds, (cwd) =>
+        Effect.tryPromise({
+          try: () =>
+            Agent.list({
+              runtime: "local",
+              cwd,
+              limit: 50,
+            }).then((result) => result.items),
+          catch: (cause) => new SessionListError({ cause }),
+        }),
+      )
+
+      return mergeListedAgents(lists)
     })
 
     const create = Effect.fn("Session.create")(function* (name?: string) {
+      const cwd = yield* Effect.tryPromise({
+        try: () => resolveDefaultSdkCwd(),
+        catch: (cause) => new AgentStartError({ cause }),
+      })
+
       const next = yield* Effect.tryPromise({
-        try: () => Agent.create(createOptions(name ?? "General chat")),
+        try: () => Agent.create(createOptions(cwd, name ?? "General chat")),
         catch: (cause) => new AgentStartError({ cause }),
       })
 
@@ -110,22 +146,54 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       }
 
       yield* Ref.set(agent, next)
+      yield* Ref.set(agentCwd, cwd)
       return next.agentId
     })
 
-    const resume = Effect.fn("Session.resume")(function* (agentId: AgentId) {
+    const resume = Effect.fn("Session.resume")(function* (agentId: AgentId, cwd?: string) {
+      const resolvedCwd =
+        cwd ??
+        (yield* Ref.get(agentCwd)) ??
+        (yield* Effect.tryPromise({
+          try: () => resolveDefaultSdkCwd(),
+          catch: (cause) => new SessionResumeError({ agentId, cause }),
+        }))
+
       const previous = yield* Ref.get(agent)
       if (previous) {
         yield* disposeAgent(previous)
       }
 
       const next = yield* Effect.tryPromise({
-        try: () => Agent.resume(agentId, createOptions()),
+        try: () => Agent.resume(agentId, createOptions(resolvedCwd)),
         catch: (cause) => new SessionResumeError({ agentId, cause }),
       })
 
       yield* Ref.set(agent, next)
+      yield* Ref.set(agentCwd, resolvedCwd)
       return next.agentId
+    })
+
+    const loadTranscript = Effect.fn("Session.loadTranscript")(function* (
+      agentId: AgentId,
+      cwd?: string,
+    ) {
+      const resolvedCwd =
+        cwd ??
+        (yield* Ref.get(agentCwd)) ??
+        (yield* Effect.tryPromise({
+          try: () => resolveDefaultSdkCwd(),
+          catch: (cause) => new SessionListError({ cause }),
+        }))
+      const messages = yield* Effect.tryPromise({
+        try: () =>
+          Agent.messages.list(agentId, {
+            runtime: "local",
+            cwd: resolvedCwd,
+          }),
+        catch: (cause) => new SessionListError({ cause }),
+      })
+      return entriesFromSdkMessages(messages)
     })
 
     const activeAgentId = Effect.fn("Session.activeAgentId")(function* () {
@@ -148,7 +216,7 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       let sawAssistant = false
 
       const run = yield* Effect.tryPromise({
-        try: () => current.send(input.text),
+        try: () => current.send(input.text, { local: { force: true } }),
         catch: (cause) => failPrompt({ agentId, sink, cause }),
       })
 
@@ -213,7 +281,7 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       }),
     )
 
-    return { list, create, resume, activeAgentId, prompt }
+    return { list, create, resume, loadTranscript, activeAgentId, prompt }
   }),
 }) {
   static readonly layer = Layer.effect(this, this.make)

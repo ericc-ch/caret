@@ -6,10 +6,9 @@ import { useLayout } from "../context/layout.ts"
 import { NavPanel } from "./nav-panel.tsx"
 import { SessionHeader } from "./session-header.tsx"
 import { ContextRail } from "./context/rail.tsx"
-import { StatusBar } from "./status-bar.tsx"
 import { TranscriptPanel } from "./transcript/transcript-panel.tsx"
 import { Prompt, type PromptStatus } from "../components/prompt.tsx"
-import type { TranscriptEntry } from "./transcript/types.ts"
+import type { TranscriptEntry } from "../lib/transcript.ts"
 
 export function AppShell(props: {
   promptStatus: PromptStatus
@@ -32,7 +31,15 @@ export function AppShell(props: {
           <NavPanel />
         </Show>
 
-        <box flexGrow={1} minHeight={0} flexDirection="column" paddingLeft={2} paddingRight={2} gap={1}>
+        <box
+          flexGrow={1}
+          minHeight={0}
+          flexDirection="column"
+          backgroundColor={theme().background}
+          paddingLeft={2}
+          paddingRight={2}
+          gap={1}
+        >
           <SessionHeader />
           <TranscriptPanel entries={props.entries} />
           <box flexShrink={0}>
@@ -72,8 +79,6 @@ export function AppShell(props: {
           </box>
         </Show>
       </box>
-
-      <StatusBar status={props.promptStatus} />
     </box>
   )
 }

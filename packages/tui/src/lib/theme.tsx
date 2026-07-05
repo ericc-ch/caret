@@ -45,7 +45,7 @@ function hex(value: string): RGBA {
 function createFallbackTheme(): Theme {
   const text = hex("#e4e4e4")
   const textMuted = hex("#8b8b8b")
-  const background = RGBA.fromValues(24 / 255, 24 / 255, 24 / 255, 0)
+  const background = hex("#181818")
   const backgroundPanel = hex("#262626")
   const backgroundElement = hex("#2e2e2e")
   const border = RGBA.fromInts(228, 228, 228, 38)
@@ -189,7 +189,6 @@ function terminalMode(colors: TerminalColors): "dark" | "light" | undefined {
 function generateSystemTheme(colors: TerminalColors, mode: "dark" | "light"): Theme {
   const bg = RGBA.fromHex(colors.defaultBackground ?? colors.palette[0]!)
   const fg = RGBA.fromHex(colors.defaultForeground ?? colors.palette[7]!)
-  const transparent = RGBA.fromValues(bg.r, bg.g, bg.b, 0)
   const isDark = mode === "dark"
 
   const col = (i: number) => {
@@ -213,7 +212,7 @@ function generateSystemTheme(colors: TerminalColors, mode: "dark" | "light"): Th
   return {
     text: fg,
     textMuted,
-    background: transparent,
+    background: bg,
     backgroundPanel: grays[2]!,
     backgroundElement: grays[3]!,
     border: grays[7]!,

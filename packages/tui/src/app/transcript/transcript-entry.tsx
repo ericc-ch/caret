@@ -1,6 +1,6 @@
 import { RGBA } from "@opentui/core"
 import { useTheme } from "../../lib/theme.tsx"
-import type { TranscriptEntry } from "./types.ts"
+import type { TranscriptEntry } from "../../lib/transcript.ts"
 
 export function TranscriptEntryView(props: { entry: TranscriptEntry }) {
   const { theme, syntax } = useTheme()

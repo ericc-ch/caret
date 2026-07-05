@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
-import { spawnSync } from "node:child_process"
-import { existsSync, mkdirSync, readdirSync } from "node:fs"
-import { join } from "node:path"
+import { NodeRuntime, NodeServices } from "@effect/platform-node"
+import { Console, Effect, FileSystem, Path } from "effect"
+import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 
 type ReferenceRepository = {
   readonly name: string
@@ -81,44 +81,64 @@ const repositories = [
 ] satisfies ReadonlyArray<ReferenceRepository>
 
 const referencesDir = "/tmp/references"
+const syncConcurrency = 4
 
-const run = (command: string, args: ReadonlyArray<string>, cwd = referencesDir) => {
-  const result = spawnSync(command, args, { cwd, stdio: "inherit" })
+const inheritedGit = (args: ReadonlyArray<string>, cwd: string) =>
+  ChildProcess.make("git", args, {
+    cwd,
+    stdout: "inherit",
+    stderr: "inherit",
+    stdin: "inherit",
+  })
 
-  if (result.error) {
-    throw result.error
-  }
+const syncRepository = (repository: ReferenceRepository) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+    const repositoryPath = path.join(referencesDir, repository.directory)
 
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1)
-  }
-}
+    const finish = (exitCode: ChildProcessSpawner.ExitCode) => {
+      if (exitCode !== ChildProcessSpawner.ExitCode(0)) {
+        process.exit(exitCode as number)
+      }
+    }
 
-console.log("Setting up /tmp/references/ directory...")
+    if (yield* fs.exists(repositoryPath)) {
+      yield* Console.log(`Pulling ${repository.name} updates...`)
+      finish(yield* spawner.exitCode(inheritedGit(["pull", "--ff-only"], repositoryPath)))
+      return
+    }
 
-mkdirSync(referencesDir, { recursive: true })
-
-for (const repository of repositories) {
-  const repositoryPath = join(referencesDir, repository.directory)
-
-  if (existsSync(repositoryPath)) {
-    console.log(`Pulling ${repository.name} updates...`)
-    run("git", ["pull", "--ff-only"], repositoryPath)
-  } else {
-    console.log(`Cloning ${repository.name}...`)
+    yield* Console.log(`Cloning ${repository.name}...`)
     const cloneArgs = ["clone", "--depth", "1"]
     if (repository.branch) {
       cloneArgs.push("--branch", repository.branch)
     }
     cloneArgs.push(repository.url, repository.directory)
-    run("git", cloneArgs, referencesDir)
-  }
-}
+    finish(yield* spawner.exitCode(inheritedGit(cloneArgs, referencesDir)))
+  })
 
-console.log("")
-console.log("All reference repositories are up to date!")
-console.log("")
-console.log("Repositories:")
-for (const entry of readdirSync(referencesDir).sort()) {
-  console.log(entry)
-}
+const program = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem
+
+  yield* Console.log("Setting up /tmp/references/ directory...")
+  yield* fs.makeDirectory(referencesDir, { recursive: true })
+
+  yield* Effect.forEach(repositories, syncRepository, {
+    concurrency: syncConcurrency,
+    discard: true,
+  })
+
+  yield* Console.log("")
+  yield* Console.log("All reference repositories are up to date!")
+  yield* Console.log("")
+  yield* Console.log("Repositories:")
+
+  const entries = yield* fs.readDirectory(referencesDir)
+  for (const entry of [...entries].sort()) {
+    yield* Console.log(entry)
+  }
+}).pipe(Effect.provide(NodeServices.layer))
+
+NodeRuntime.runMain(program)
