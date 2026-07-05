@@ -3,3 +3,5 @@ dist/
 .output/
 .references/
 *.tsbuildinfo
+result
+.direnv/

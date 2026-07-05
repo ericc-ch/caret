@@ -1,0 +1,44 @@
+{
+  "nodes": {
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1782978903,
+        "narHash": "sha256-bG1LAS3YehMzp4RSXw99o3yMEO/Ktb0Tx29RCtEU0Tk=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "d33369954a67ae3322177dc9a3d564092912120c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixpkgs-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "nixpkgs": "nixpkgs",
+        "terminal-control-src": "terminal-control-src"
+      }
+    },
+    "terminal-control-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1782400711,
+        "narHash": "sha256-N6fwTkOjXqVplser4YBz+a0JuAZBGp2bKks1EUKRSdA=",
+        "owner": "kitlangton",
+        "repo": "terminal-control",
+        "rev": "31ae4fd2b8cc8c8c64ef44040eb3ab567a02a382",
+        "type": "github"
+      },
+      "original": {
+        "owner": "kitlangton",
+        "repo": "terminal-control",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
