@@ -1,8 +1,7 @@
 import process from "node:process"
 
-export const NAV_WIDTH = 28
-export const CONTEXT_WIDTH = 24
-export const WIDE_BREAKPOINT = 120
+export const TAB_RAIL_WIDTH = 22
+export const WIDE_BREAKPOINT = 100
 
 export function truncatePath(path: string, maxLength = 32) {
   if (path.length <= maxLength) return path
@@ -13,8 +12,4 @@ export function truncatePath(path: string, maxLength = 32) {
     return `…${shortened.slice(-(maxLength - 1))}`
   }
   return `…${path.slice(-(maxLength - 1))}`
-}
-
-export function displayCwd() {
-  return truncatePath(process.cwd())
 }

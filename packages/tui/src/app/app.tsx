@@ -1,19 +1,56 @@
-import { createEffect, createMemo, createSignal, onCleanup } from "solid-js"
+import { useAtom, useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-solid"
+import { createEffect, onCleanup, onMount } from "solid-js"
 import { useKeyboard, useRenderer } from "@opentui/solid"
-import { LayoutProvider } from "../context/layout.ts"
-import { SessionProvider, useSession } from "../context/session-context.ts"
+import { Commit, type TranscriptSink } from "../lib/transcript.ts"
 import { formatError } from "../lib/format-error.ts"
 import { copySelectedText } from "../lib/selection.ts"
-import { localAgentCwd } from "../lib/workspace.ts"
-import { Commit } from "../lib/transcript.ts"
-import { createTranscriptStore } from "./transcript/transcript-store.ts"
+import {
+  activeAgentIdAtom,
+  bootAtom,
+  bootErrorAtom,
+  commitTranscript,
+  emptyTranscriptState,
+  hydrateTranscript,
+  loadTranscriptAtom,
+  promptAtom,
+  promptStatusAtom,
+  promptSubmittingAtom,
+  sessionListAtom,
+  sessionsAtom,
+  switchTranscriptAgent,
+  transcriptStateAtom,
+} from "../lib/atoms/index.ts"
+import { sessionInputForAgent } from "../lib/workspace.ts"
 import { AppShell } from "./app-shell.tsx"
 
-function AppInner() {
-  const session = useSession()
+const loadingTranscripts = new Set<string>()
+
+export function App() {
+  useAtomMount(() => sessionsAtom)
+  useAtomMount(() => bootAtom)
+
+  const activeAgentId = useAtomValue(() => activeAgentIdAtom)
+  const sessions = useAtomValue(() => sessionListAtom)
+  const promptStatus = useAtomValue(() => promptStatusAtom)
+  const bootError = useAtomValue(() => bootErrorAtom)
+
+  const [, setTranscriptState] = useAtom(() => transcriptStateAtom)
+  const setSubmitting = useAtomSet(() => promptSubmittingAtom)
+
+  const runBoot = useAtomSet(() => bootAtom, { mode: "promise" })
+  const runLoadTranscript = useAtomSet(() => loadTranscriptAtom, { mode: "promise" })
+  const runPrompt = useAtomSet(() => promptAtom, { mode: "promise" })
+
   const renderer = useRenderer()
-  const store = createTranscriptStore()
-  const [submitting, setSubmitting] = createSignal(false)
+
+  const sink: TranscriptSink = {
+    commit(commit) {
+      setTranscriptState((state) => commitTranscript(state, commit))
+    },
+    dispose() {
+      setTranscriptState(() => emptyTranscriptState())
+    },
+  }
 
   useKeyboard((event) => {
     if (!event.ctrl || !event.shift || event.name !== "c") return
@@ -22,63 +59,62 @@ function AppInner() {
     event.stopPropagation()
   })
 
-  const promptStatus = createMemo(() => {
-    if (submitting()) return "running" as const
-    if (session.booting()) return "connecting" as const
-    if (session.bootError()) return "unavailable" as const
-    return "ready" as const
+  onMount(() => {
+    void runBoot(undefined)
   })
 
   createEffect(() => {
-    const agentId = session.activeAgentId()
-    store.switchAgent(agentId)
-    if (!agentId || store.hasCache(agentId)) return
+    const agentId = activeAgentId()
+    if (!agentId) {
+      setTranscriptState((state) => switchTranscriptAgent(state, undefined))
+      return
+    }
 
-    const item = session.sessions().find((entry) => entry.agentId === agentId)
-    const cwd = item ? localAgentCwd(item) : undefined
+    let shouldLoad = false
+    setTranscriptState((state) => {
+      const next = state.activeAgentId === agentId ? state : switchTranscriptAgent(state, agentId)
+      shouldLoad = !next.cache.has(agentId) && !loadingTranscripts.has(agentId)
+      if (shouldLoad) loadingTranscripts.add(agentId)
+      return next
+    })
 
-    void session
-      .loadTranscript(agentId, cwd)
+    if (!shouldLoad) return
+
+    const input = sessionInputForAgent(agentId, sessions())
+    void runLoadTranscript(input)
       .then((entries) => {
-        if (session.activeAgentId() === agentId) {
-          store.hydrate(agentId, entries)
+        if (activeAgentId() === agentId) {
+          setTranscriptState((current) => hydrateTranscript(current, agentId, entries))
         }
       })
       .catch((cause) => {
-        if (session.activeAgentId() === agentId) {
-          store.commit(Commit.Error({ text: formatError(cause) }))
+        if (activeAgentId() === agentId) {
+          setTranscriptState((current) =>
+            commitTranscript(current, Commit.Error({ text: formatError(cause) })),
+          )
         }
+      })
+      .finally(() => {
+        loadingTranscripts.delete(agentId)
       })
   })
 
   createEffect(() => {
-    const error = session.bootError()
+    const error = bootError()
     if (error) {
-      store.commit(Commit.Error({ text: error }))
+      setTranscriptState((state) => commitTranscript(state, Commit.Error({ text: error })))
     }
   })
 
   onCleanup(() => {
-    store.dispose()
+    sink.dispose()
   })
 
   const submit = (text: string) => {
     if (promptStatus() !== "ready") return
     setSubmitting(true)
-    void session.prompt({ text, sink: store }).finally(() => setSubmitting(false))
+    void runPrompt({ text, sink }).finally(() => setSubmitting(false))
   }
 
-  return (
-    <AppShell promptStatus={promptStatus()} onSubmit={submit} entries={store.entries} />
-  )
-}
-
-export function App() {
-  return (
-    <SessionProvider>
-      <LayoutProvider>
-        <AppInner />
-      </LayoutProvider>
-    </SessionProvider>
-  )
+  return <AppShell promptStatus={promptStatus()} onSubmit={submit} />
 }

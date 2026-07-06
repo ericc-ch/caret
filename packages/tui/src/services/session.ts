@@ -9,13 +9,32 @@ import {
 } from "../lib/transcript.ts"
 import { formatError } from "../lib/format-error.ts"
 import {
+  mergeListedAgents,
+  resolveAndValidateProjectPath,
   resolveDefaultSdkCwd,
-  resolveSdkListCwds,
+  seedOpenedCwds,
+  type ProjectCwd,
 } from "../lib/workspace.ts"
 
 export type AgentId = string
 
 export type { SDKAgentInfo }
+
+export type AgentTabInput = {
+  readonly agentId: AgentId
+  readonly cwd?: ProjectCwd
+}
+
+export type CreateTabInput = {
+  readonly cwd?: ProjectCwd
+  readonly name?: string
+}
+
+export type ResumeTabInput = AgentTabInput
+
+export type LoadTranscriptInput = AgentTabInput
+
+export type ArchiveTabInput = AgentTabInput
 
 export class AgentNotActive extends Schema.TaggedErrorClass<AgentNotActive>()(
   "AgentNotActive",
@@ -38,11 +57,27 @@ export class SessionResumeError extends Schema.TaggedErrorClass<SessionResumeErr
   },
 ) {}
 
+export class SessionArchiveError extends Schema.TaggedErrorClass<SessionArchiveError>()(
+  "SessionArchiveError",
+  {
+    agentId: Schema.String,
+    cause: Schema.Defect(),
+  },
+) {}
+
 export class PromptError extends Schema.TaggedErrorClass<PromptError>()("PromptError", {
   agentId: Schema.String,
   runId: Schema.optional(Schema.String),
   detail: Schema.optional(Schema.String),
 }) {}
+
+export class InvalidProjectPath extends Schema.TaggedErrorClass<InvalidProjectPath>()(
+  "InvalidProjectPath",
+  {
+    input: Schema.String,
+    reason: Schema.String,
+  },
+) {}
 
 type PromptInput = {
   readonly text: string
@@ -51,15 +86,20 @@ type PromptInput = {
 
 export type SessionInterface = {
   readonly list: () => Effect.Effect<ReadonlyArray<SDKAgentInfo>, SessionListError>
-  readonly create: (name?: string) => Effect.Effect<AgentId, AgentStartError>
-  readonly resume: (agentId: AgentId, cwd?: string) => Effect.Effect<AgentId, SessionResumeError>
+  readonly create: (input?: CreateTabInput) => Effect.Effect<AgentId, AgentStartError>
+  readonly resume: (input: ResumeTabInput) => Effect.Effect<AgentId, SessionResumeError>
+  readonly archive: (input: ArchiveTabInput) => Effect.Effect<void, SessionArchiveError>
+  readonly dispose: (agentId: AgentId) => Effect.Effect<void>
   readonly loadTranscript: (
-    agentId: AgentId,
-    cwd?: string,
+    input: LoadTranscriptInput,
   ) => Effect.Effect<ReadonlyArray<TranscriptEntry>, SessionListError>
   readonly activeAgentId: () => Effect.Effect<AgentId | undefined>
+  readonly activeCwd: () => Effect.Effect<ProjectCwd | undefined>
+  readonly openedCwds: () => Effect.Effect<ReadonlyArray<ProjectCwd>>
   readonly prompt: (input: PromptInput) => Effect.Effect<void, AgentNotActive | PromptError>
 }
+
+const DEFAULT_TAB_NAME = "General chat"
 
 function createOptions(cwd: string, name?: string) {
   const apiKey = process.env["CURSOR_API_KEY"]
@@ -90,53 +130,62 @@ function failPrompt(input: {
   return new PromptError({ agentId: input.agentId, runId: input.runId, detail })
 }
 
-function mergeListedAgents(lists: ReadonlyArray<ReadonlyArray<SDKAgentInfo>>) {
-  const merged = new Map<string, SDKAgentInfo>()
-  for (const items of lists) {
-    for (const item of items) {
-      const existing = merged.get(item.agentId)
-      if (!existing || (item.lastModified ?? 0) >= (existing.lastModified ?? 0)) {
-        merged.set(item.agentId, item)
-      }
-    }
-  }
-  return [...merged.values()].sort((a, b) => (b.lastModified ?? 0) - (a.lastModified ?? 0))
-}
-
 export class Session extends Context.Service<Session, SessionInterface>()("@caret/Session", {
   make: Effect.gen(function* () {
     const agent = yield* Ref.make<SDKAgent | undefined>(undefined)
-    const agentCwd = yield* Ref.make<string | undefined>(undefined)
+    const agentCwd = yield* Ref.make<ProjectCwd | undefined>(undefined)
+    const openedCwds = yield* Ref.make<ReadonlySet<ProjectCwd>>(new Set())
 
-    const list = Effect.fn("Session.list")(function* () {
-      const cwds = yield* Effect.tryPromise({
-        try: () => resolveSdkListCwds(),
-        catch: (cause) => new SessionListError({ cause }),
-      })
+    yield* Effect.tryPromise({
+      try: () => seedOpenedCwds(),
+      catch: (cause) => new SessionListError({ cause }),
+    }).pipe(Effect.flatMap((cwds) => Ref.set(openedCwds, new Set(cwds))))
 
-      const lists = yield* Effect.forEach(cwds, (cwd) =>
-        Effect.tryPromise({
-          try: () =>
-            Agent.list({
-              runtime: "local",
-              cwd,
-              limit: 50,
-            }).then((result) => result.items),
-          catch: (cause) => new SessionListError({ cause }),
-        }),
-      )
-
-      return mergeListedAgents(lists)
+    const addOpenedCwd = Effect.fnUntraced(function* (cwd: ProjectCwd) {
+      const current = yield* Ref.get(openedCwds)
+      if (current.has(cwd)) return
+      yield* Ref.set(openedCwds, new Set([...current, cwd]))
     })
 
-    const create = Effect.fn("Session.create")(function* (name?: string) {
-      const cwd = yield* Effect.tryPromise({
+    const resolveCwd = Effect.fnUntraced(function* (cwd: ProjectCwd | undefined) {
+      if (cwd) return cwd
+      const active = yield* Ref.get(agentCwd)
+      if (active) return active
+      return yield* Effect.tryPromise({
         try: () => resolveDefaultSdkCwd(),
         catch: (cause) => new AgentStartError({ cause }),
       })
+    })
+
+    const list = Effect.fn("Session.list")(function* () {
+      const cwds = [...(yield* Ref.get(openedCwds))]
+      const lists = yield* Effect.forEach(
+        cwds,
+        (cwd) =>
+          Effect.tryPromise({
+            try: () =>
+              Agent.list({
+                runtime: "local",
+                cwd,
+                limit: 50,
+              }).then((result) => result.items),
+            catch: (cause) => new SessionListError({ cause }),
+          }),
+        { concurrency: "unbounded" },
+      )
+
+      return mergeListedAgents(lists).filter((item) => !item.archived)
+    })
+
+    const create = Effect.fn("Session.create")(function* (input?: CreateTabInput) {
+      const cwd = yield* input?.cwd
+        ? Effect.succeed(input.cwd)
+        : resolveCwd(undefined)
+
+      yield* addOpenedCwd(cwd)
 
       const next = yield* Effect.tryPromise({
-        try: () => Agent.create(createOptions(cwd, name ?? "General chat")),
+        try: () => Agent.create(createOptions(cwd, input?.name ?? DEFAULT_TAB_NAME)),
         catch: (cause) => new AgentStartError({ cause }),
       })
 
@@ -150,14 +199,12 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       return next.agentId
     })
 
-    const resume = Effect.fn("Session.resume")(function* (agentId: AgentId, cwd?: string) {
-      const resolvedCwd =
-        cwd ??
-        (yield* Ref.get(agentCwd)) ??
-        (yield* Effect.tryPromise({
-          try: () => resolveDefaultSdkCwd(),
-          catch: (cause) => new SessionResumeError({ agentId, cause }),
-        }))
+    const resume = Effect.fn("Session.resume")(function* (input: ResumeTabInput) {
+      const resolvedCwd = yield* resolveCwd(input.cwd).pipe(
+        Effect.mapError((cause) => new SessionResumeError({ agentId: input.agentId, cause })),
+      )
+
+      yield* addOpenedCwd(resolvedCwd)
 
       const previous = yield* Ref.get(agent)
       if (previous) {
@@ -165,8 +212,8 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       }
 
       const next = yield* Effect.tryPromise({
-        try: () => Agent.resume(agentId, createOptions(resolvedCwd)),
-        catch: (cause) => new SessionResumeError({ agentId, cause }),
+        try: () => Agent.resume(input.agentId, createOptions(resolvedCwd)),
+        catch: (cause) => new SessionResumeError({ agentId: input.agentId, cause }),
       })
 
       yield* Ref.set(agent, next)
@@ -174,20 +221,31 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       return next.agentId
     })
 
-    const loadTranscript = Effect.fn("Session.loadTranscript")(function* (
-      agentId: AgentId,
-      cwd?: string,
-    ) {
-      const resolvedCwd =
-        cwd ??
-        (yield* Ref.get(agentCwd)) ??
-        (yield* Effect.tryPromise({
-          try: () => resolveDefaultSdkCwd(),
-          catch: (cause) => new SessionListError({ cause }),
-        }))
+    const dispose = Effect.fn("Session.dispose")(function* (agentId: AgentId) {
+      const current = yield* Ref.get(agent)
+      if (!current || current.agentId !== agentId) return
+      yield* disposeAgent(current)
+      yield* Ref.set(agent, undefined)
+    })
+
+    const archive = Effect.fn("Session.archive")(function* (input: ArchiveTabInput) {
+      const resolvedCwd = yield* resolveCwd(input.cwd).pipe(
+        Effect.mapError((cause) => new SessionArchiveError({ agentId: input.agentId, cause })),
+      )
+
+      yield* Effect.tryPromise({
+        try: () => Agent.archive(input.agentId, { cwd: resolvedCwd }),
+        catch: (cause) => new SessionArchiveError({ agentId: input.agentId, cause }),
+      })
+    })
+
+    const loadTranscript = Effect.fn("Session.loadTranscript")(function* (input: LoadTranscriptInput) {
+      const resolvedCwd = yield* resolveCwd(input.cwd).pipe(
+        Effect.mapError((cause) => new SessionListError({ cause })),
+      )
       const messages = yield* Effect.tryPromise({
         try: () =>
-          Agent.messages.list(agentId, {
+          Agent.messages.list(input.agentId, {
             runtime: "local",
             cwd: resolvedCwd,
           }),
@@ -199,6 +257,14 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
     const activeAgentId = Effect.fn("Session.activeAgentId")(function* () {
       const current = yield* Ref.get(agent)
       return current?.agentId
+    })
+
+    const activeCwd = Effect.fn("Session.activeCwd")(function* () {
+      return yield* Ref.get(agentCwd)
+    })
+
+    const openedCwdsList = Effect.fn("Session.openedCwds")(function* () {
+      return [...(yield* Ref.get(openedCwds))]
     })
 
     const prompt = Effect.fn("Session.prompt")(function* (input: PromptInput) {
@@ -281,8 +347,27 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       }),
     )
 
-    return { list, create, resume, loadTranscript, activeAgentId, prompt }
+    return {
+      list,
+      create,
+      resume,
+      archive,
+      dispose,
+      loadTranscript,
+      activeAgentId,
+      activeCwd,
+      openedCwds: openedCwdsList,
+      prompt,
+    }
   }),
 }) {
   static readonly layer = Layer.effect(this, this.make)
 }
+
+export const createTabInDirectory = Effect.fn("createTabInDirectory")(function* (path: string) {
+  const result = yield* Effect.promise(() => resolveAndValidateProjectPath(path))
+  if (!result.ok) {
+    return yield* new InvalidProjectPath({ input: path, reason: result.error })
+  }
+  return yield* Session.use((session) => session.create({ cwd: result.path }))
+})

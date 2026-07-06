@@ -59,3 +59,5 @@ Cursor SDK is not open source. See `/tmp/references/cursor-cookbook` for SDK doc
 ## Idiomatic Effect (v4)
 
 Use `/tmp/references/effect-smol` as the source of truth (also `ai-docs/` inside it for patterns).
+
+For everything, consider Effect as the default first choice. Always explore if Effect has a built-in solution before writing custom logic or using external libraries (for example, using Effect Atoms from `effect/unstable/reactivity` instead of native Solid JS state like `createSignal` / `createStore`).

@@ -1,11 +1,14 @@
 import { For, createMemo } from "solid-js"
+import { useAtomValue } from "@effect/atom-solid"
 import { useTerminalDimensions } from "@opentui/solid"
-import type { TranscriptEntry } from "../../lib/transcript.ts"
+import { transcriptEntriesAtom } from "../../lib/atoms/index.ts"
+import { WIDE_BREAKPOINT } from "../../lib/layout.ts"
 import { TranscriptEntryView } from "./transcript-entry.tsx"
 
-export function TranscriptPanel(props: { entries: () => ReadonlyArray<TranscriptEntry> }) {
+export function TranscriptPanel() {
   const dimensions = useTerminalDimensions()
-  const showScrollbar = createMemo(() => dimensions().width >= 100)
+  const entries = useAtomValue(() => transcriptEntriesAtom)
+  const showScrollbar = createMemo(() => dimensions().width >= WIDE_BREAKPOINT)
 
   return (
     <scrollbox
@@ -20,7 +23,7 @@ export function TranscriptPanel(props: { entries: () => ReadonlyArray<Transcript
       }}
     >
       <box height={1} />
-      <For each={props.entries()}>{(entry) => <TranscriptEntryView entry={entry} />}</For>
+      <For each={entries()}>{(entry) => <TranscriptEntryView entry={entry} />}</For>
     </scrollbox>
   )
 }
