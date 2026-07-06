@@ -56,7 +56,7 @@ export const transcriptEntriesAtom = Atom.make((get) => {
 
 export const activeSessionAtom = sessionRuntime
   .atom(Session.use((session) => session.activeAgentId()))
-  .pipe(Atom.keepAlive)
+  .pipe(Atom.keepAlive, Atom.withReactivity(sessionReactivity))
 
 const sessionStatusAtom = sessionRuntime
   .atom(Session.use((session) => session.status()))

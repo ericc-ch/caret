@@ -83,7 +83,6 @@ export function Prompt(props: { status: PromptStatus; onSubmit: (text: string) =
       paddingBottom={1}
       gap={0}
     >
-      <text fg={theme().textMuted}>Message</text>
       <textarea
         ref={(value) => {
           textarea = value
