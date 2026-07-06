@@ -7,10 +7,7 @@ import { Prompt, type PromptStatus } from "../components/prompt.tsx"
 import { TabRail } from "./tab-rail.tsx"
 import { TranscriptPanel } from "./transcript/transcript-panel.tsx"
 
-export function AppShell(props: {
-  promptStatus: PromptStatus
-  onSubmit: (text: string) => void
-}) {
+export function AppShell(props: { promptStatus: PromptStatus; onSubmit: (text: string) => void }) {
   const { theme } = useTheme()
   const dimensions = useTerminalDimensions()
   const wide = createMemo(() => dimensions().width >= WIDE_BREAKPOINT)
@@ -19,6 +16,7 @@ export function AppShell(props: {
     <box
       width={dimensions().width}
       height={dimensions().height}
+      paddingY={1}
       flexDirection="column"
       backgroundColor={theme().background}
     >

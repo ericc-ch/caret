@@ -1,7 +1,7 @@
 import { For, createMemo } from "solid-js"
 import { useAtomValue } from "@effect/atom-solid"
 import { useTerminalDimensions } from "@opentui/solid"
-import { transcriptEntriesAtom } from "../../lib/atoms/index.ts"
+import { transcriptEntriesAtom } from "../../lib/atoms/session-atoms.ts"
 import { WIDE_BREAKPOINT } from "../../lib/layout.ts"
 import { TranscriptEntryView } from "./transcript-entry.tsx"
 

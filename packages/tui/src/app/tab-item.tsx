@@ -1,11 +1,11 @@
 import { MouseButton, TextAttributes } from "@opentui/core"
 import { isContextMenuGesture } from "../components/context-menu.tsx"
 import { useTheme } from "../lib/theme.tsx"
-import type { TabViewModel } from "../lib/tab-display.ts"
+import type { SessionLabel } from "../lib/session-display.ts"
 import type { AgentId } from "../services/session.ts"
 
 export function TabItem(props: {
-  tab: TabViewModel
+  tab: SessionLabel
   onSelect: (agentId: AgentId) => void
   onContextMenu: (input: { agentId: AgentId; x: number; y: number }) => void
 }) {

@@ -15,11 +15,6 @@ export type TranscriptEntry =
   | { readonly id: string; readonly kind: "thinking"; readonly text: string; readonly streaming: boolean }
   | { readonly id: string; readonly kind: "assistant"; readonly text: string; readonly streaming: boolean }
 
-export type TranscriptSink = {
-  commit(commit: StreamCommit): void
-  dispose(): void
-}
-
 const entryIdPattern = /^entry-(\d+)$/
 
 function nextEntryId(entries: ReadonlyArray<TranscriptEntry>) {

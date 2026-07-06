@@ -3,12 +3,12 @@ import { MouseButton, TextAttributes } from "@opentui/core"
 import { createSignal, For, Show } from "solid-js"
 import { ContextMenu, type ContextMenuItem } from "../components/context-menu.tsx"
 import {
-  closeTabAtom,
-  createTabAtom,
-  createTabInDirectoryAtom,
-  switchTabAtom,
-  tabViewModelsAtom,
-} from "../lib/atoms/index.ts"
+  closeSessionAtom,
+  createSessionAtom,
+  openDirectoryAtom,
+  sessionLabelsAtom,
+  switchSessionAtom,
+} from "../lib/atoms/session-atoms.ts"
 import { TAB_RAIL_WIDTH } from "../lib/layout.ts"
 import { useTheme } from "../lib/theme.tsx"
 import { formatError } from "../lib/format-error.ts"
@@ -24,11 +24,11 @@ export function TabRail() {
   const [pathPickerOpen, setPathPickerOpen] = createSignal(false)
   const [tabRailError, setTabRailError] = createSignal<string | undefined>(undefined)
 
-  const tabs = useAtomValue(() => tabViewModelsAtom)
-  const runSwitch = useAtomSet(() => switchTabAtom, { mode: "promise" })
-  const runCreate = useAtomSet(() => createTabAtom, { mode: "promise" })
-  const runCreateInDirectory = useAtomSet(() => createTabInDirectoryAtom, { mode: "promise" })
-  const runCloseTab = useAtomSet(() => closeTabAtom, { mode: "promise" })
+  const tabs = useAtomValue(() => sessionLabelsAtom)
+  const runSwitch = useAtomSet(() => switchSessionAtom, { mode: "promise" })
+  const runCreate = useAtomSet(() => createSessionAtom, { mode: "promise" })
+  const runCreateInDirectory = useAtomSet(() => openDirectoryAtom, { mode: "promise" })
+  const runCloseTab = useAtomSet(() => closeSessionAtom, { mode: "promise" })
 
   const reportError = (cause: unknown) => {
     setTabRailError(formatError(cause))

@@ -1,5 +1,6 @@
 ## Coding Style
 
+- Use `main.ts` / `main.tsx` for module entry points (barrel files, package roots). Do not use `index.ts` / `index.tsx`.
 - Never explicitly write types unless needed. Prefer type inference.
 - Extract a helper only when reused or when duplication is worse than indirection. Avoid splitting logic into small named pieces for "structure".
 - Prefer cohesive files over micro-modules. Don't create a new file for a one-off helper, a single export, or a few lines that only one caller uses — keep that logic in the file it belongs to. Split only when a module has a clear boundary (e.g. an adapter, a shared handler) or when reuse across callers justifies it.

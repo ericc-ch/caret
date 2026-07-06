@@ -1,4 +1,4 @@
-import { createCliRenderer } from "@opentui/core"
+import { ConsolePosition, createCliRenderer } from "@opentui/core"
 import { render } from "@opentui/solid"
 import { RegistryProvider } from "@effect/atom-solid"
 import { App } from "./app/app.tsx"
@@ -14,7 +14,11 @@ const renderer = await createCliRenderer({
   exitOnCtrlC: true,
   useKittyKeyboard: {},
   autoFocus: false,
-  openConsoleOnError: false,
+  consoleOptions: {
+    position: ConsolePosition.RIGHT,
+    sizePercent: 50,
+    keyBindings: [{ name: "y", ctrl: true, action: "copy-selection" }],
+  },
   useMouse: true,
 })
 
