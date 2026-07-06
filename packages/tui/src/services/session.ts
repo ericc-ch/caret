@@ -5,7 +5,7 @@ import process from "node:process"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 import { Agent, type SDKAgent, type SDKAgentInfo } from "@cursor/sdk"
-import { Context, Effect, Layer, Ref, Schema, SubscriptionRef } from "effect"
+import { Context, Effect, Layer, Ref, Schema, Stream, SubscriptionRef } from "effect"
 import { formatError } from "../lib/format-error.ts"
 import {
   applyCommit,
@@ -169,10 +169,6 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
     const appendTranscript = (commit: StreamCommit) =>
       SubscriptionRef.update(transcript, (entries) => applyCommit(entries, commit))
 
-    const syncAppendTranscript = (commit: StreamCommit) => {
-      Effect.runSync(appendTranscript(commit))
-    }
-
     const setTranscript = (entries: ReadonlyArray<TranscriptEntry>) =>
       SubscriptionRef.set(transcript, entries)
 
@@ -311,56 +307,61 @@ export class Session extends Context.Service<Session, SessionInterface>()("@care
       let sawThinking = false
       let sawAssistant = false
 
-      const failPrompt = (input: { runId?: string; cause?: unknown; detail?: string }) => {
+      const promptError = (input: { runId?: string; cause?: unknown; detail?: string }) => {
         const detail = input.detail ?? formatError(input.cause)
-        syncAppendTranscript(Commit.Error({ text: detail }))
-        Effect.runSync(Ref.set(status, "unavailable"))
         return new PromptError({ agentId, runId: input.runId, detail })
       }
+
+      const failPrompt = (error: PromptError) =>
+        Effect.gen(function* () {
+          yield* appendTranscript(Commit.Error({ text: error.detail ?? formatError(error) }))
+          yield* Ref.set(status, "unavailable")
+          return yield* error
+        })
 
       yield* Effect.gen(function* () {
         const run = yield* Effect.tryPromise({
           try: () => current.send(text, { local: { force: true } }),
-          catch: (cause) => failPrompt({ cause }),
+          catch: (cause) => promptError({ cause }),
         })
 
-        yield* Effect.tryPromise({
-          try: async () => {
-            for await (const event of run.stream()) {
+        yield* Stream.fromAsyncIterable(run.stream(), (cause) => promptError({ runId: run.id, cause })).pipe(
+          Stream.runForEach((event) =>
+            Effect.gen(function* () {
               if (event.type === "assistant") {
                 const chunk = event.message.content
                   .flatMap((block) => (block.type === "text" ? [block.text] : []))
                   .join("")
-                if (!chunk) continue
+                if (!chunk) return
 
                 assistantText += chunk
                 sawAssistant = true
-                syncAppendTranscript(Commit.Assistant({ text: assistantText, done: false }))
+                yield* appendTranscript(Commit.Assistant({ text: assistantText, done: false }))
               }
 
               if (event.type === "thinking" && event.text) {
                 thinkingText = event.text
                 sawThinking = true
-                syncAppendTranscript(Commit.Thinking({ text: thinkingText, done: false }))
+                yield* appendTranscript(Commit.Thinking({ text: thinkingText, done: false }))
               }
-            }
-          },
-          catch: (cause) => failPrompt({ runId: run.id, cause }),
-        })
+            }),
+          ),
+        )
 
         const result = yield* Effect.tryPromise({
           try: () => run.wait(),
-          catch: (cause) => failPrompt({ runId: run.id, cause }),
+          catch: (cause) => promptError({ runId: run.id, cause }),
         })
 
         if (result.status === "error") {
           const trimmed = result.result?.trim()
-          return yield* failPrompt({
+          return yield* promptError({
             runId: run.id,
             ...(trimmed ? { detail: trimmed } : { cause: result }),
           })
         }
       }).pipe(
+        Effect.catch(failPrompt),
         Effect.ensuring(
           Effect.gen(function* () {
             if (sawThinking) {
