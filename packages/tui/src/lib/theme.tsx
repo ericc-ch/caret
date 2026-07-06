@@ -13,7 +13,6 @@ export type Theme = {
   readonly text: RGBA
   readonly textMuted: RGBA
   readonly background: RGBA
-  readonly backgroundPanel: RGBA
   readonly backgroundElement: RGBA
   readonly border: RGBA
   readonly accent: RGBA
@@ -46,7 +45,6 @@ function createFallbackTheme(): Theme {
   const text = hex("#e4e4e4")
   const textMuted = hex("#8b8b8b")
   const background = hex("#181818")
-  const backgroundPanel = hex("#262626")
   const backgroundElement = hex("#2e2e2e")
   const border = RGBA.fromInts(228, 228, 228, 38)
   const accent = hex("#81a1c1")
@@ -57,7 +55,6 @@ function createFallbackTheme(): Theme {
     text,
     textMuted,
     background,
-    backgroundPanel,
     backgroundElement,
     border,
     accent,
@@ -213,7 +210,6 @@ function generateSystemTheme(colors: TerminalColors, mode: "dark" | "light"): Th
     text: fg,
     textMuted,
     background: bg,
-    backgroundPanel: grays[2]!,
     backgroundElement: grays[3]!,
     border: grays[7]!,
     accent: ansiColors.cyan,

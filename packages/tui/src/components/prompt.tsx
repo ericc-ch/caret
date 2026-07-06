@@ -1,22 +1,14 @@
 import type { KeyBinding, TextareaRenderable } from "@opentui/core"
-import { AtomRef } from "effect/unstable/reactivity"
-import { createEffect, on, onCleanup } from "solid-js"
+import { createEffect, on } from "solid-js"
 import { useTheme } from "../lib/theme.tsx"
+import type { AgentStatus } from "../services/cursor-agent.ts"
 
 const keyBindings = [
   { name: "return", action: "submit" },
   { name: "return", meta: true, action: "newline" },
 ] satisfies Array<KeyBinding>
 
-export type PromptStatus = "connecting" | "unavailable" | "ready" | "running"
-
-export type PromptRef = {
-  readonly focused: boolean
-  focus(): void
-  blur(): void
-}
-
-export const promptRef = AtomRef.make<PromptRef | undefined>(undefined)
+export type PromptStatus = AgentStatus
 
 export function Prompt(props: { status: PromptStatus; onSubmit: (text: string) => void }) {
   const { theme } = useTheme()
@@ -46,18 +38,6 @@ export function Prompt(props: { status: PromptStatus; onSubmit: (text: string) =
     props.onSubmit(text)
   }
 
-  const handle = {
-    get focused() {
-      return textarea?.focused ?? false
-    },
-    focus() {
-      textarea?.focus()
-    },
-    blur() {
-      textarea?.blur()
-    },
-  }
-
   createEffect(
     on(
       () => props.status,
@@ -67,10 +47,6 @@ export function Prompt(props: { status: PromptStatus; onSubmit: (text: string) =
       },
     ),
   )
-
-  onCleanup(() => {
-    promptRef.set(undefined)
-  })
 
   return (
     <box
@@ -86,7 +62,6 @@ export function Prompt(props: { status: PromptStatus; onSubmit: (text: string) =
       <textarea
         ref={(value) => {
           textarea = value
-          promptRef.set(handle)
         }}
         onMouseDown={(event) => event.target?.focus()}
         flexGrow={1}

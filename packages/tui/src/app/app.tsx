@@ -3,28 +3,31 @@ import { onMount } from "solid-js"
 import { useKeyboard, useRenderer } from "@opentui/solid"
 import { copySelectedText } from "../lib/selection.ts"
 import {
-  bootAtom,
+  cancelAtom,
   promptAtom,
   promptStatusAtom,
-  sessionsAtom,
   transcriptAtom,
-} from "../lib/atoms/session-atoms.ts"
+} from "../lib/atoms/agent-atoms.ts"
 import { AppShell } from "./app-shell.tsx"
 
 export function App() {
-  useAtomMount(() => sessionsAtom)
   useAtomMount(() => transcriptAtom)
-  useAtomMount(() => bootAtom)
 
   const promptStatus = useAtomValue(() => promptStatusAtom)
-  const runBoot = useAtomSet(() => bootAtom, { mode: "promise" })
   const runPrompt = useAtomSet(() => promptAtom, { mode: "promise" })
+  const runCancel = useAtomSet(() => cancelAtom, { mode: "promise" })
 
   const renderer = useRenderer()
 
   useKeyboard((event) => {
     if (event.name === "f12") {
       renderer.console.toggle()
+      event.preventDefault()
+      event.stopPropagation()
+      return
+    }
+    if (event.name === "escape" && promptStatus() === "running") {
+      void runCancel(undefined).catch(() => undefined)
       event.preventDefault()
       event.stopPropagation()
       return
@@ -41,12 +44,11 @@ export function App() {
       renderer.copyToClipboardOSC52(text)
       renderer.clearSelection()
     }
-    void runBoot(undefined)
   })
 
   const submit = (text: string) => {
     if (promptStatus() !== "ready") return
-    void runPrompt(text)
+    void runPrompt(text).catch(() => undefined)
   }
 
   return <AppShell promptStatus={promptStatus()} onSubmit={submit} />

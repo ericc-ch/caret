@@ -32,6 +32,13 @@ When spawning Task subagents (review, explore, `/simplify`, etc.), use either Co
 - `packages/agent` (`@caret/agent`) — personal multi-channel host (OpenClaw-shaped): chat platforms in, Cursor SDK as the brain, **executor** as the code/tools engine via MCP (`executor mcp --elicitation-mode model`).
 - `packages/tui` (`@caret/tui`) — alternative Cursor CLI frontend on OpenTUI. Separate effort; not wired to `@caret/agent` for now.
 
+## TUI Principles
+
+- Optimize the TUI for performance, UX, and transparency. Avoid invisible startup work; every user action should produce immediate feedback; show agent activity as it happens.
+- Use OpenCode as the primary TUI UX reference, especially for compact interleaved tool-call rendering.
+- Treat the Cursor SDK as the source of truth for sessions. The intended model is many named SDK-backed sessions per cwd.
+- Do not list, resume, hydrate, or create SDK sessions on startup unless the current UI needs it. The default launch path starts empty and creates a fresh named local SDK agent lazily on the first prompt.
+
 ## References Directory
 
 The `/tmp/references/` directory contains shallow clones of important external repositories (populated by `bun scripts/references.ts`).

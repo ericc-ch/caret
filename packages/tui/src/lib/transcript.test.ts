@@ -1,9 +1,7 @@
-import type { AgentMessage } from "@cursor/sdk"
 import { describe, expect, it } from "vitest"
 import {
   applyCommit,
   Commit,
-  entriesFromSdkMessages,
   type StreamCommit,
   type TranscriptEntry,
 } from "./transcript.ts"
@@ -73,84 +71,38 @@ describe("applyCommit", () => {
 
     expect(original).toEqual(snapshot)
   })
-})
 
-describe("entriesFromSdkMessages", () => {
-  const conversation = [
-    {
-      message: {
-        turn: {
-          case: "agentConversationTurn",
-          value: {
-            userMessage: { text: "What is 2+2?" },
-            steps: [
-              {
-                message: {
-                  case: "thinkingMessage",
-                  value: { text: "I need to calculate" },
-                },
-              },
-              {
-                message: {
-                  case: "thinkingMessage",
-                  value: { text: "it's simple math" },
-                },
-              },
-              {
-                message: {
-                  case: "assistantMessage",
-                  value: { text: "The answer is " },
-                },
-              },
-              {
-                message: {
-                  case: "assistantMessage",
-                  value: { text: "4." },
-                },
-              },
-            ],
-          },
-        },
-      },
-    },
-    {
-      message: {
-        agentConversationTurn: {
-          userMessage: { text: "Thanks" },
-          steps: [],
-        },
-      },
-    },
-    {
-      type: "assistant",
-      message: {
-        content: [{ type: "text", text: "You're welcome!" }],
-      },
-    },
-  ] as unknown as ReadonlyArray<AgentMessage>
+  it("upserts tool calls by call id with compact known-tool summaries", () => {
+    const running = applyCommit(
+      [],
+      Commit.Tool({
+        callId: "call-1",
+        name: "functions.Shell",
+        status: "running",
+        args: { command: "bun run check" },
+      }),
+    )
+    const completed = applyCommit(
+      running,
+      Commit.Tool({
+        callId: "call-1",
+        name: "functions.Shell",
+        status: "completed",
+        args: { command: "bun run check" },
+        result: "ok",
+      }),
+    )
 
-  it("maps persisted SDK messages to ordered transcript entries with deterministic ids", () => {
-    expect(entriesFromSdkMessages(conversation)).toEqual([
-      { id: "entry-1", kind: "user", text: "What is 2+2?" },
+    expect(completed).toEqual([
       {
-        id: "entry-2",
-        kind: "thinking",
-        text: "Thinking: I need to calculate\nit's simple math",
-        streaming: false,
+        id: "tool-call-1",
+        kind: "tool",
+        toolName: "Shell",
+        status: "completed",
+        summary: "bun run check",
+        inputPreview: "{\"command\":\"bun run check\"}",
+        outputPreview: "ok",
       },
-      { id: "entry-3", kind: "assistant", text: "The answer is 4.", streaming: false },
-      { id: "entry-4", kind: "user", text: "Thanks" },
-      { id: "entry-5", kind: "assistant", text: "You're welcome!", streaming: false },
-    ])
-  })
-
-  it("extends replayed entries with live commits using continuing ids", () => {
-    const replayed = entriesFromSdkMessages(conversation)
-    const extended = applyCommit(replayed, Commit.User({ text: "Follow-up" }))
-
-    expect(extended).toEqual([
-      ...replayed,
-      { id: "entry-6", kind: "user", text: "Follow-up" },
     ])
   })
 })
