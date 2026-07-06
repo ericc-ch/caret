@@ -34,19 +34,9 @@ const repositories = [
     branch: "dev",
   },
   {
-    name: "t1code",
-    directory: "t1code",
-    url: "https://github.com/maria-rcks/t1code.git",
-  },
-  {
     name: "Cursor Cookbook",
     directory: "cursor-cookbook",
     url: "https://github.com/cursor/cookbook.git",
-  },
-  {
-    name: "Playwright",
-    directory: "playwright",
-    url: "https://github.com/microsoft/playwright.git",
   },
   {
     name: "Executor",
@@ -57,11 +47,6 @@ const repositories = [
     name: "Playwriter",
     directory: "playwriter",
     url: "https://github.com/remorses/playwriter.git",
-  },
-  {
-    name: "Agent Browser",
-    directory: "agent-browser",
-    url: "https://github.com/vercel-labs/agent-browser.git",
   },
   {
     name: "OpenClaw",
